@@ -1,7 +1,9 @@
-// api/webhook.js — финальная версия с Google Sheets
+// api/webhook.js — финальная версия с JSONBin
+const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
+const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
+
 module.exports = async (req, res) => {
   const BOT_TOKEN = process.env.BOT_TOKEN;
-  const SHEET_ID = '1AtFXRO85k3E7TyJ3GW7kogiejMUhFpeLXHgMcoARNSw';
   
   if (req.method === 'GET') {
     return res.status(200).json({ ok: true, message: 'Epstain Bot 🧼' });
@@ -17,52 +19,49 @@ module.exports = async (req, res) => {
         const username = update.message.from.username || update.message.from.first_name;
         const text = update.message.text;
         
-        // Загружаем данные из Google Sheets
-        let userData = await loadUserData(SHEET_ID, userId);
+        // Загружаем данные
+        let data = await loadData();
+        if (!data.users) data.users = {};
         
-        if (!userData) {
-          userData = { balance: 0, username: username, lastFarm: 0 };
-        }
+        const user = data.users[userId] || { balance: 0, lastFarm: 0, username: username };
         
         // /farm
         if (text === '/farm') {
           const now = Math.floor(Date.now() / 1000);
           
-          if (userData.lastFarm && (now - userData.lastFarm) < 3600) {
-            const remaining = Math.ceil(3600 - (now - userData.lastFarm));
+          if (user.lastFarm && (now - user.lastFarm) < 3600) {
+            const remaining = 3600 - (now - user.lastFarm);
             const minutes = Math.floor(remaining / 60);
-            const seconds = remaining % 60;
-            await sendMessage(BOT_TOKEN, chatId, `⏰ Подожди еще ${minutes} мин ${seconds} сек!`);
+            await sendMessage(BOT_TOKEN, chatId, `⏰ Подожди еще ${minutes} минут!`);
           } else {
             const soap = Math.floor(Math.random() * 30) + 1;
-            userData.balance += soap;
-            userData.lastFarm = now;
-            userData.username = username;
+            user.balance += soap;
+            user.lastFarm = now;
+            user.username = username;
             
-            await saveUserData(SHEET_ID, userId, userData);
+            data.users[userId] = user;
+            await saveData(data);
             
-            await sendMessage(BOT_TOKEN, chatId, `🧼 +${soap} мыла!\n📊 Баланс: ${userData.balance} 🧼`);
+            await sendMessage(BOT_TOKEN, chatId, `🧼 +${soap} мыла!\n📊 Баланс: ${user.balance} 🧼`);
           }
         }
         
         // /balance
         else if (text === '/balance') {
-          await sendMessage(BOT_TOKEN, chatId, `📊 ${username}, у тебя ${userData.balance} 🧼`);
+          await sendMessage(BOT_TOKEN, chatId, `📊 ${username}, у тебя ${user.balance} 🧼`);
         }
         
         // /top
         else if (text === '/top') {
-          const allUsers = await getAllUsers(SHEET_ID);
-          const sorted = Object.values(allUsers)
-            .sort((a, b) => b.balance - a.balance)
-            .slice(0, 10);
+          const users = Object.values(data.users);
+          const sorted = users.sort((a, b) => b.balance - a.balance).slice(0, 10);
           
           if (sorted.length === 0) {
             await sendMessage(BOT_TOKEN, chatId, 'Топ пуст! Нафарми первый 🧼');
           } else {
             let reply = '🏆 ТОП МЫЛОВАРОВ 🧼\n\n';
-            sorted.forEach((user, i) => {
-              reply += `${i+1}. ${user.username} — ${user.balance} 🧼\n`;
+            sorted.forEach((u, i) => {
+              reply += `${i+1}. ${u.username} — ${u.balance} 🧼\n`;
             });
             await sendMessage(BOT_TOKEN, chatId, reply);
           }
@@ -71,10 +70,7 @@ module.exports = async (req, res) => {
         // /start
         else if (text === '/start') {
           await sendMessage(BOT_TOKEN, chatId, 
-            `Привет, ${username}! 🧼\n\n` +
-            `/farm — нафармить мыло (1-30, раз в час)\n` +
-            `/balance — проверить баланс\n` +
-            `/top — топ игроков`
+            `Привет, ${username}! 🧼\n\n/farm — нафармить мыло (1-30, раз в час)\n/balance — баланс\n/top — топ игроков`
           );
         }
       }
@@ -82,7 +78,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: true });
     } catch (error) {
       console.error('Error:', error);
-      await sendMessage(BOT_TOKEN, req.body?.message?.chat?.id, `❌ Ошибка: ${error.message}`);
       return res.status(200).json({ ok: false, error: error.message });
     }
   }
@@ -90,90 +85,32 @@ module.exports = async (req, res) => {
   return res.status(405).json({ error: 'Method not allowed' });
 };
 
-// ========== ФУНКЦИИ GOOGLE SHEETS ==========
-
-async function loadUserData(sheetId, userId) {
+// Функции работы с JSONBin
+async function loadData() {
   try {
-    const url = `https://opensheet.elk.sh/${sheetId}/Sheet1`;
-    const response = await fetch(url);
+    const response = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`, {
+      headers: { 'X-Master-Key': JSONBIN_API_KEY }
+    });
     const data = await response.json();
-    
-    const userRow = data.find(row => row.user_id == userId);
-    
-    if (userRow) {
-      return {
-        balance: parseInt(userRow.balance) || 0,
-        username: userRow.username,
-        lastFarm: parseInt(userRow.last_farm) || 0
-      };
-    }
-    return null;
+    return data.record;
   } catch (error) {
     console.error('Load error:', error);
-    return null;
+    return { users: {} };
   }
 }
 
-async function saveUserData(sheetId, userId, data) {
+async function saveData(data) {
   try {
-    // Получаем все данные
-    const url = `https://opensheet.elk.sh/${sheetId}/Sheet1`;
-    const response = await fetch(url);
-    const rows = await response.json();
-    
-    // Находим индекс строки пользователя
-    const rowIndex = rows.findIndex(row => row.user_id == userId);
-    
-    if (rowIndex !== -1) {
-      // Обновляем существующую строку
-      const updateUrl = `https://opensheet.elk.sh/${sheetId}/Sheet1/${rowIndex + 2}`;
-      await fetch(updateUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: data.username,
-          balance: data.balance,
-          last_farm: data.lastFarm
-        })
-      });
-    } else {
-      // Добавляем новую строку
-      await fetch(`https://opensheet.elk.sh/${sheetId}/Sheet1`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([{
-          user_id: userId,
-          username: data.username,
-          balance: data.balance,
-          last_farm: data.lastFarm
-        }])
-      });
-    }
+    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JSONBIN_API_KEY
+      },
+      body: JSON.stringify(data)
+    });
   } catch (error) {
     console.error('Save error:', error);
-  }
-}
-
-async function getAllUsers(sheetId) {
-  try {
-    const url = `https://opensheet.elk.sh/${sheetId}/Sheet1`;
-    const response = await fetch(url);
-    const rows = await response.json();
-    
-    const users = {};
-    rows.forEach(row => {
-      if (row.user_id) {
-        users[row.user_id] = {
-          balance: parseInt(row.balance) || 0,
-          username: row.username,
-          lastFarm: parseInt(row.last_farm) || 0
-        };
-      }
-    });
-    return users;
-  } catch (error) {
-    console.error('Get all error:', error);
-    return {};
   }
 }
 
