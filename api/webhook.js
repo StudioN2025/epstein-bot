@@ -5,10 +5,10 @@ const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
 const ALLOWED_CHAT_ID = -1003608269453;
 const GROUP_INVITE_LINK = 'https://t.me/epstainisland';
 
-// Константы вора Пидиди
-const P DIDI_STEAL_CHANCE = 5;  // 5% шанс кражи
-const P DIDI_STEAL_MIN = 1;
-const P DIDI_STEAL_MAX = 10;
+// Константы вора Пидиди (без пробелов!)
+const PIDIDI_STEAL_CHANCE = 5;  // 5% шанс кражи
+const PIDIDI_STEAL_MIN = 1;
+const PIDIDI_STEAL_MAX = 10;
 
 let duels = {};
 
@@ -317,8 +317,8 @@ module.exports = async (req, res) => {
           
           // Шанс 5% на вора Пидиди
           const roll = Math.random() * 100;
-          if (roll < P DIDI_STEAL_CHANCE) {
-            const stolen = Math.floor(Math.random() * (P DIDI_STEAL_MAX - P DIDI_STEAL_MIN + 1)) + P DIDI_STEAL_MIN;
+          if (roll < PIDIDI_STEAL_CHANCE) {
+            const stolen = Math.floor(Math.random() * (PIDIDI_STEAL_MAX - PIDIDI_STEAL_MIN + 1)) + PIDIDI_STEAL_MIN;
             const newBalance = user.balance - stolen;
             
             if (newBalance < 0) {
