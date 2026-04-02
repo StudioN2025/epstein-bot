@@ -1,9 +1,14 @@
-// api/webhook.js — дуэль с кнопками
+// api/webhook.js — полная версия с детским мылом и Пидиди
 const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
 const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
 
 const ALLOWED_CHAT_ID = -1003608269453;
 const GROUP_INVITE_LINK = 'https://t.me/epstainisland';
+
+// Константы вора Пидиди
+const P DIDI_STEAL_CHANCE = 5;  // 5% шанс кражи
+const P DIDI_STEAL_MIN = 1;
+const P DIDI_STEAL_MAX = 10;
 
 let duels = {};
 
@@ -44,7 +49,7 @@ module.exports = async (req, res) => {
             duel.aim2 = 0;
             
             await editMessage(BOT_TOKEN, chatId, messageId,
-              `⚔️ *ДУЭЛЬ НАЧАЛАСЬ!* ⚔️\n\n${duel.player1Name} VS ${username}\n\n🎯 *Базовый шанс: 20%*\n🎯 Каждый "Прицел" +10% (макс 70%)\n💰 При попадании забираешь 3 мыла\n\n👉 *Ход ${duel.player1Name}*`,
+              `⚔️ *ДУЭЛЬ НАЧАЛАСЬ!* ⚔️\n\n${duel.player1Name} VS ${username}\n\n🎯 *Базовый шанс: 20%*\n🎯 Каждый "Прицел" +10% (макс 70%)\n💰 При попадании забираешь 3 детского мыла\n\n👉 *Ход ${duel.player1Name}*`,
               getDuelKeyboard(duel.player1Id, duel.player2Id, duel.turn, duel.aim1, duel.aim2)
             );
             
@@ -70,7 +75,7 @@ module.exports = async (req, res) => {
         // ДЕЙСТВИЯ В ДУЭЛИ
         else if (data.startsWith('duel_action_')) {
           const parts = data.split('_');
-          const action = parts[2]; // aim, unaim, shoot
+          const action = parts[2];
           const duelId = parts[3];
           const duel = duels[duelId];
           
@@ -80,7 +85,6 @@ module.exports = async (req, res) => {
             return res.status(200).json({ ok: true });
           }
           
-          // Проверка чей ход
           if (duel.turn !== userId) {
             const waitingName = duel.turn === duel.player1Id ? duel.player1Name : duel.player2Name;
             await answerCallback(callback.id, `⏳ Сейчас ход ${waitingName}!`);
@@ -105,7 +109,7 @@ module.exports = async (req, res) => {
             }
             
             await editMessage(BOT_TOKEN, chatId, messageId,
-              `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n🎯 *Шанс ${username}: ${20 + aimBonus}%* (база 20% + ${aimBonus}% от прицела)\n💰 При попадании забираешь 3 мыла\n\n👉 *Ход ${username}*`,
+              `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n🎯 *Шанс ${username}: ${20 + aimBonus}%* (база 20% + ${aimBonus}% от прицела)\n💰 При попадании забираешь 3 детского мыла\n\n👉 *Ход ${username}*`,
               getDuelKeyboard(duel.player1Id, duel.player2Id, duel.turn, duel.aim1, duel.aim2)
             );
             
@@ -121,7 +125,7 @@ module.exports = async (req, res) => {
             }
             
             await editMessage(BOT_TOKEN, chatId, messageId,
-              `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n🎯 *Шанс ${username}: 20%* (прицел сброшен)\n💰 При попадании забираешь 3 мыла\n\n👉 *Ход ${username}*`,
+              `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n🎯 *Шанс ${username}: 20%* (прицел сброшен)\n💰 При попадании забираешь 3 детского мыла\n\n👉 *Ход ${username}*`,
               getDuelKeyboard(duel.player1Id, duel.player2Id, duel.turn, duel.aim1, duel.aim2)
             );
             
@@ -140,7 +144,6 @@ module.exports = async (req, res) => {
             
             let resultText = `🎲 *${shooterName} стреляет!* Шанс: ${hitChance}%, выпало: ${hitRoll.toFixed(1)}%\n\n`;
             
-            // Загружаем данные
             let data = await loadData();
             if (!data.users) data.users = {};
             
@@ -151,13 +154,13 @@ module.exports = async (req, res) => {
               if (targetData.balance < 3) {
                 targetData.mutedUntil = Math.floor(Date.now() / 1000) + 60;
                 targetData.balance = 0;
-                resultText += `💥 *ПОПАДАНИЕ!* 💥\n\n😵 У ${targetName} не было 3 мыла! Он получил МУТ на 1 минуту!\n\n🏆 *ПОБЕДИТЕЛЬ: ${shooterName}* 🏆`;
-                delete duels[duelId];
+                resultText += `💥 *ПОПАДАНИЕ!* 💥\n\n😵 У ${targetName} не было 3 детского мыла! Он получил МУТ на 1 минуту!\n\n🏆 *ПОБЕДИТЕЛЬ: ${shooterName}* 🏆`;
+                delete duels[duel.id];
               } else {
                 targetData.balance -= 3;
                 shooterData.balance += 3;
-                resultText += `💥 *ПОПАДАНИЕ!* 💥\n\n🧼 ${shooterName} забрал 3 мыла у ${targetName}!\n📊 ${shooterName}: ${shooterData.balance} 🧼\n📊 ${targetName}: ${targetData.balance} 🧼\n\n🏆 *ПОБЕДИТЕЛЬ: ${shooterName}* 🏆`;
-                delete duels[duelId];
+                resultText += `💥 *ПОПАДАНИЕ!* 💥\n\n🧼 ${shooterName} забрал 3 детского мыла у ${targetName}!\n📊 ${shooterName}: ${shooterData.balance} 🧼\n📊 ${targetName}: ${targetData.balance} 🧼\n\n🏆 *ПОБЕДИТЕЛЬ: ${shooterName}* 🏆`;
+                delete duels[duel.id];
               }
               
               data.users[targetId] = targetData;
@@ -169,7 +172,6 @@ module.exports = async (req, res) => {
             } else {
               resultText += `💨 *ПРОМАХ!* 💨\n\n👉 *Теперь ход ${targetName}!*`;
               
-              // Сбрасываем прицел и передаем ход
               if (isPlayer1) {
                 duel.aim1 = 0;
                 duel.turn = duel.player2Id;
@@ -203,7 +205,7 @@ module.exports = async (req, res) => {
       
       // Проверка группы
       if (chatId !== ALLOWED_CHAT_ID) {
-        let reply = `🧼 Бот работает только на острове: ${GROUP_INVITE_LINK}`;
+        let reply = `🧼 Детское мыло только на острове: ${GROUP_INVITE_LINK}`;
         await sendMessage(BOT_TOKEN, chatId, reply);
         return res.status(200).json({ ok: true });
       }
@@ -256,7 +258,6 @@ module.exports = async (req, res) => {
           return res.status(200).json({ ok: true });
         }
         
-        // Проверка на уже активную дуэль
         for (const duel of Object.values(duels)) {
           if (duel.player1Id === userId || duel.player2Id === userId) {
             await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, ты уже участвуешь в дуэли!`);
@@ -286,7 +287,7 @@ module.exports = async (req, res) => {
         };
         
         await sendMessage(BOT_TOKEN, chatId, 
-          `⚔️ *ДУЭЛЬ!* ⚔️\n\n${username} вызывает на дуэль @${opponentName}!\n\n📊 У противника ${opponent.balance} 🧼 мыла.\n💰 Победитель забирает 3 мыла!\n🎯 Базовый шанс: 20% | Кнопка "Прицел" +10%\n\n⏳ У тебя 60 секунд, чтобы принять!`,
+          `⚔️ *ДУЭЛЬ!* ⚔️\n\n${username} вызывает на дуэль @${opponentName}!\n\n📊 У противника ${opponent.balance} 🧼 детского мыла.\n💰 Победитель забирает 3 детского мыла!\n🎯 Базовый шанс: 20% | Кнопка "Прицел" +10%\n\n⏳ У тебя 60 секунд, чтобы принять!`,
           keyboard
         );
         
@@ -298,7 +299,7 @@ module.exports = async (req, res) => {
         }, 60000);
       }
       
-      // ========== ОСТАЛЬНЫЕ КОМАНДЫ ==========
+      // ========== /FARM с Пидиди ==========
       else if (cleanText === '/farm') {
         const now = Math.floor(Date.now() / 1000);
         
@@ -312,41 +313,61 @@ module.exports = async (req, res) => {
           user.lastFarm = now;
           user.username = username;
           
+          let message = `🧼 ${username}, ты нафармил +${soap} детского мыла!\n📊 Баланс: ${user.balance} 🧼`;
+          
+          // Шанс 5% на вора Пидиди
+          const roll = Math.random() * 100;
+          if (roll < P DIDI_STEAL_CHANCE) {
+            const stolen = Math.floor(Math.random() * (P DIDI_STEAL_MAX - P DIDI_STEAL_MIN + 1)) + P DIDI_STEAL_MIN;
+            const newBalance = user.balance - stolen;
+            
+            if (newBalance < 0) {
+              user.balance = 0;
+              message = `😡👶 *ПИДИДИ УКРАЛ ДЕТСКОЕ МЫЛО!* 👶😡\n\n${username}, ты нафармил +${soap} мыла, НО Пидиди украл всё! У тебя было ${user.balance + stolen}, осталось 0!\n\n🍼 *ПИДИДИ СКАЗАЛ:* "Детское мыло только для детей! Не трожь!" 👶🧼`;
+            } else {
+              user.balance = newBalance;
+              message = `😡👶 *ПИДИДИ УКРАЛ ДЕТСКОЕ МЫЛО!* 👶😡\n\n${username}, ты нафармил +${soap} мыла, НО Пидиди украл ${stolen} мыла!\n📊 Было: ${user.balance + stolen}, стало: ${user.balance} 🧼\n\n🍼 *ПИДИДИ СКАЗАЛ:* "Это мое мыло!" 👶🧼`;
+            }
+          }
+          
           data.users[userId] = user;
           await saveData(data);
-          
-          await sendMessage(BOT_TOKEN, chatId, `🧼 ${username}, ты нафармил +${soap} мыла!\n📊 Баланс: ${user.balance} 🧼`);
+          await sendMessage(BOT_TOKEN, chatId, message);
         }
       }
       
+      // ========== /BALANCE ==========
       else if (cleanText === '/balance') {
-        await sendMessage(BOT_TOKEN, chatId, `📊 ${username}, у тебя ${user.balance} 🧼`);
+        await sendMessage(BOT_TOKEN, chatId, `📊 ${username}, у тебя ${user.balance} 🧼 детского мыла`);
       }
       
+      // ========== /TOP ==========
       else if (cleanText === '/top') {
         const users = Object.values(data.users);
         const sorted = users.sort((a, b) => b.balance - a.balance).slice(0, 10);
         
         if (sorted.length === 0) {
-          await sendMessage(BOT_TOKEN, chatId, 'Топ пуст! Нафарми первый 🧼');
+          await sendMessage(BOT_TOKEN, chatId, 'Топ пуст! Нафарми детское мыло первым 🧼');
         } else {
           let reply = '🏆 ТОП МЫЛОВАРОВ ОСТРОВА 🧼\n\n';
           sorted.forEach((u, i) => {
-            reply += `${i+1}. ${u.username} — ${u.balance} 🧼\n`;
+            reply += `${i+1}. ${u.username} — ${u.balance} 🧼 детского мыла\n`;
           });
           await sendMessage(BOT_TOKEN, chatId, reply);
         }
       }
       
+      // ========== /START ==========
       else if (cleanText === '/start') {
         await sendMessage(BOT_TOKEN, chatId, 
           `🧼 *Остров Эпштейна* 🏝️\n\nПривет, ${username}!\n\n` +
           `🎯 *Команды:*\n` +
-          `/farm — нафармить мыло (1-30, раз в час)\n` +
-          `/balance — баланс\n` +
+          `/farm — нафармить детское мыло (1-30, раз в час)\n` +
+          `/balance — баланс детского мыла\n` +
           `/top — топ мыловаров\n` +
           `/duel @username — вызвать на дуэль\n\n` +
-          `⚔️ *Дуэль:* Все действия через кнопки! Базовый шанс 20%, каждая кнопка "Прицел" +10% (макс 70%). При попадании забираешь 3 мыла.`
+          `⚠️ *ВНИМАНИЕ!* Пидиди с вероятностью 5% может украсть твое мыло (1-10 штук)!\n\n` +
+          `⚔️ *Дуэль:* Все действия через кнопки! Базовый шанс 20%, каждая кнопка "Прицел" +10% (макс 70%). При попадании забираешь 3 детского мыла.`
         );
       }
       
