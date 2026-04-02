@@ -17,6 +17,28 @@ function cleanCommand(text) {
   return text.toLowerCase().replace(/@\w+/, '').trim();
 }
 
+// Проверка является ли пользователь админом группы
+async function isGroupAdmin(botToken, chatId, userId) {
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/getChatMember`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, user_id: userId })
+    });
+    const data = await response.json();
+    
+    if (data.ok && data.result) {
+      const status = data.result.status;
+      return status === 'creator' || status === 'administrator';
+    }
+    return false;
+  } catch (error) {
+    console.error('Admin check error:', error);
+    return false;
+  }
+}
+
 module.exports = async (req, res) => {
   const BOT_TOKEN = process.env.BOT_TOKEN;
   
@@ -223,13 +245,172 @@ module.exports = async (req, res) => {
       let user = data.users[userId] || { balance: 0, children: 0, username: username, lastFarm: 0, mutedUntil: 0 };
       if (user.children === undefined) user.children = 0;
       
+      // Проверка мута
       if (user.mutedUntil && user.mutedUntil > Math.floor(Date.now() / 1000)) {
         const remaining = user.mutedUntil - Math.floor(Date.now() / 1000);
         await sendMessage(BOT_TOKEN, chatId, `🔇 ${username}, мут ${Math.ceil(remaining / 60)} мин!`);
         return res.status(200).json({ ok: true });
       }
       
-      if (cleanText === '/buychild') {
+      // Проверка на админа группы
+      const isAdmin = await isGroupAdmin(BOT_TOKEN, chatId, userId);
+      
+      // ========== АДМИН-КОМАНДЫ ==========
+      
+      // /addsoap @user 50 - добавить мыло (только админ)
+      if (isAdmin && cleanText.startsWith('/addsoap')) {
+        const parts = rawText.split(' ');
+        if (parts.length < 3) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, пример: /addsoap @username 50`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetUsername = parts[1].replace('@', '');
+        const amount = parseInt(parts[2]);
+        
+        if (isNaN(amount) || amount <= 0) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetId = null;
+        for (const [id, u] of Object.entries(data.users)) {
+          if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+            targetId = parseInt(id);
+            break;
+          }
+        }
+        
+        if (!targetId) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetUser = data.users[targetId] || { balance: 0, children: 0 };
+        targetUser.balance = (targetUser.balance || 0) + amount;
+        targetUser.username = targetUsername;
+        data.users[targetId] = targetUser;
+        await saveData(data);
+        
+        await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} добавил ${amount} 🧼 пользователю @${targetUsername}\n📊 Теперь у него: ${targetUser.balance} 🧼`);
+      }
+      
+      // /removesoap @user 50 - снять мыло (только админ)
+      else if (isAdmin && cleanText.startsWith('/removesoap')) {
+        const parts = rawText.split(' ');
+        if (parts.length < 3) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, пример: /removesoap @username 50`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetUsername = parts[1].replace('@', '');
+        const amount = parseInt(parts[2]);
+        
+        if (isNaN(amount) || amount <= 0) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetId = null;
+        for (const [id, u] of Object.entries(data.users)) {
+          if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+            targetId = parseInt(id);
+            break;
+          }
+        }
+        
+        if (!targetId) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetUser = data.users[targetId] || { balance: 0, children: 0 };
+        targetUser.balance = Math.max(0, (targetUser.balance || 0) - amount);
+        targetUser.username = targetUsername;
+        data.users[targetId] = targetUser;
+        await saveData(data);
+        
+        await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} снял ${amount} 🧼 у пользователя @${targetUsername}\n📊 Теперь у него: ${targetUser.balance} 🧼`);
+      }
+      
+      // /addchild @user 2 - добавить детей (только админ)
+      else if (isAdmin && cleanText.startsWith('/addchild')) {
+        const parts = rawText.split(' ');
+        if (parts.length < 3) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, пример: /addchild @username 2`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetUsername = parts[1].replace('@', '');
+        const amount = parseInt(parts[2]);
+        
+        if (isNaN(amount) || amount <= 0) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetId = null;
+        for (const [id, u] of Object.entries(data.users)) {
+          if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+            targetId = parseInt(id);
+            break;
+          }
+        }
+        
+        if (!targetId) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetUser = data.users[targetId] || { balance: 0, children: 0 };
+        targetUser.children = (targetUser.children || 0) + amount;
+        targetUser.username = targetUsername;
+        data.users[targetId] = targetUser;
+        await saveData(data);
+        
+        await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} добавил ${amount} 👶 пользователю @${targetUsername}\n📊 Теперь у него: ${targetUser.children} 👶`);
+      }
+      
+      // /removechild @user 2 - снять детей (только админ)
+      else if (isAdmin && cleanText.startsWith('/removechild')) {
+        const parts = rawText.split(' ');
+        if (parts.length < 3) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, пример: /removechild @username 2`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetUsername = parts[1].replace('@', '');
+        const amount = parseInt(parts[2]);
+        
+        if (isNaN(amount) || amount <= 0) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetId = null;
+        for (const [id, u] of Object.entries(data.users)) {
+          if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+            targetId = parseInt(id);
+            break;
+          }
+        }
+        
+        if (!targetId) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetUser = data.users[targetId] || { balance: 0, children: 0 };
+        targetUser.children = Math.max(0, (targetUser.children || 0) - amount);
+        targetUser.username = targetUsername;
+        data.users[targetId] = targetUser;
+        await saveData(data);
+        
+        await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} снял ${amount} 👶 у пользователя @${targetUsername}\n📊 Теперь у него: ${targetUser.children} 👶`);
+      }
+      
+      // /buychild
+      else if (cleanText === '/buychild') {
         if (user.balance >= CHILD_COST) {
           user.balance -= CHILD_COST;
           user.children += 1;
@@ -241,10 +422,12 @@ module.exports = async (req, res) => {
         }
       }
       
+      // /children
       else if (cleanText === '/children') {
         await sendMessage(BOT_TOKEN, chatId, `👶 ДЕТИ ${username}:\n🧼 ${user.balance} мыла\n👶 ${user.children} детей\n/buychild - 100 мыла = 1 ребенок`);
       }
       
+      // /topchildren
       else if (cleanText === '/topchildren') {
         const users = Object.values(data.users);
         const sorted = users.sort((a, b) => (b.children || 0) - (a.children || 0)).slice(0, 10);
@@ -259,172 +442,54 @@ module.exports = async (req, res) => {
         }
       }
       
-      else if (cleanText.startsWith('/duel')) {
+      // /sendsoap
+      else if (cleanText.startsWith('/sendsoap')) {
         const parts = rawText.split(' ');
-        let targetUsername = parts[1];
-        if (!targetUsername) {
-          await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /duel @username`);
+        if (parts.length < 3) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, пример: /sendsoap @username 50`);
           return res.status(200).json({ ok: true });
         }
-        targetUsername = targetUsername.replace('@', '');
         
-        let opponentId = null;
+        let targetUsername = parts[1].replace('@', '');
+        const amount = parseInt(parts[2]);
+        
+        if (isNaN(amount) || amount <= 0) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, укажи положительное число!`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetId = null;
+        let targetName = targetUsername;
         for (const [id, u] of Object.entries(data.users)) {
           if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
-            opponentId = parseInt(id);
+            targetId = parseInt(id);
+            targetName = u.username;
             break;
           }
         }
         
-        if (!opponentId || opponentId === userId) {
-          await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+        if (!targetId) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, не найден игрок @${targetUsername}`);
           return res.status(200).json({ ok: true });
         }
         
-        const duelId = Date.now().toString();
-        duels[duelId] = {
-          id: duelId, player1Id: userId, player1Name: username,
-          player2Id: opponentId, player2Name: targetUsername,
-          status: 'waiting', turn: null, aim1: 0, aim2: 0
-        };
-        
-        const keyboard = {
-          inline_keyboard: [[
-            { text: '⚔️ ПРИНЯТЬ', callback_data: `accept_${duelId}` },
-            { text: '❌ ОТМЕНА', callback_data: 'cancel' }
-          ]]
-        };
-        
-        await sendMessage(BOT_TOKEN, chatId,
-          `⚔️ ДУЭЛЬ!\n${username} вызывает @${targetUsername}!\nПобедитель забирает 3 мыла!\n60 секунд на принятие!`,
-          keyboard
-        );
-        
-        setTimeout(() => {
-          if (duels[duelId] && duels[duelId].status === 'waiting') {
-            delete duels[duelId];
-            sendMessage(BOT_TOKEN, chatId, `⏰ Дуэль отменена`);
-          }
-        }, 60000);
-      }
-      
-      else if (cleanText === '/farm') {
-        const now = Math.floor(Date.now() / 1000);
-        if (user.lastFarm && (now - user.lastFarm) < 3600) {
-          const minutes = Math.ceil((3600 - (now - user.lastFarm)) / 60);
-          await sendMessage(BOT_TOKEN, chatId, `⏰ ${username}, жди ${minutes} мин!`);
-        } else {
-          const soap = Math.floor(Math.random() * 30) + 1;
-          user.balance += soap;
-          user.lastFarm = now;
-          user.username = username;
-          
-          let message = `🧼 ${username}, +${soap} мыла!\n🧼 ${user.balance} мыла, 👶 ${user.children} детей\n/buychild - 100 мыла = ребенок`;
-          
-          if (Math.random() * 100 < PIDIDI_STEAL_CHANCE) {
-            const stolen = Math.floor(Math.random() * (PIDIDI_STEAL_MAX - PIDIDI_STEAL_MIN + 1)) + PIDIDI_STEAL_MIN;
-            if (user.balance - stolen <= 0) {
-              user.balance = 0;
-              message = `😡👶 ПИДИДИ УКРАЛ ВСЁ!\n${username}, осталось 0 мыла!`;
-            } else {
-              user.balance -= stolen;
-              message = `😡👶 ПИДИДИ УКРАЛ ${stolen} МЫЛА!\n🧼 Осталось: ${user.balance}`;
-            }
-          }
-          
-          data.users[userId] = user;
-          await saveData(data);
-          await sendMessage(BOT_TOKEN, chatId, message);
+        if (targetId === userId) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, нельзя переводить мыло самому себе!`);
+          return res.status(200).json({ ok: true });
         }
-      }
-      
-      else if (cleanText === '/balance') {
-        await sendMessage(BOT_TOKEN, chatId, `📊 ${username}\n🧼 Мыла: ${user.balance}\n👶 Детей: ${user.children || 0}\n/buychild - 100 мыла = ребенок`);
-      }
-      
-      else if (cleanText === '/top') {
-        const users = Object.values(data.users);
-        const sorted = users.sort((a, b) => b.balance - a.balance).slice(0, 10);
-        let reply = '🏆 ТОП МЫЛА 🏆\n\n';
-        sorted.forEach((u, i) => {
-          reply += `${i+1}. ${u.username} — ${u.balance} 🧼 (${u.children || 0}👶)\n`;
-        });
-        await sendMessage(BOT_TOKEN, chatId, reply);
-      }
-      
-      else if (cleanText === '/start') {
-        await sendMessage(BOT_TOKEN, chatId,
-          `🧼 ОСТРОВ ЭПШТЕЙНА 🏝️\n\nПривет, ${username}!\n\n` +
-          `/farm — фарм мыла (1-30, раз в час)\n` +
-          `/balance — баланс\n` +
-          `/top — топ по мылу\n` +
-          `/children — мои дети\n` +
-          `/topchildren — топ по детям\n` +
-          `/buychild — купить ребенка (100 мыла)\n` +
-          `/duel @user — дуэль (ставка 3 мыла)\n\n` +
-          `⚠️ Пидиди крадет мыло (5%)\n👶 1 ребенок = 100 мыла`
-        );
-      }
-      
-      return res.status(200).json({ ok: true });
-    } catch (error) {
-      console.error('Error:', error);
-      return res.status(200).json({ ok: false, error: error.message });
-    }
-  }
-  
-  return res.status(405).json({ error: 'Method not allowed' });
-};
-
-async function loadData() {
-  try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`, {
-      headers: { 'X-Master-Key': JSONBIN_API_KEY }
-    });
-    const data = await res.json();
-    return data.record;
-  } catch (e) {
-    return { users: {} };
-  }
-}
-
-async function saveData(data) {
-  try {
-    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY },
-      body: JSON.stringify(data)
-    });
-  } catch (e) {}
-}
-
-async function sendMessage(token, chatId, text, keyboard = null) {
-  const body = { chat_id: chatId, text, parse_mode: 'Markdown' };
-  if (keyboard) body.reply_markup = keyboard;
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-  });
-}
-
-async function editMessage(token, chatId, messageId, text, keyboard = null) {
-  const body = { chat_id: chatId, message_id: messageId, text, parse_mode: 'Markdown' };
-  if (keyboard) body.reply_markup = keyboard;
-  await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-  });
-}
-
-async function deleteMessage(token, chatId, messageId) {
-  await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, message_id: messageId })
-  });
-}
-
-async function answerCallback(callbackId, text = null) {
-  const body = { callback_query_id: callbackId };
-  if (text) body.text = text;
-  await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/answerCallbackQuery`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-  });
-      }
+        
+        let targetUser = data.users[targetId] || { balance: 0, children: 0, username: targetName };
+        
+        if (user.balance < amount) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, не хватает мыла! Есть: ${user.balance}, нужно: ${amount}`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        user.balance -= amount;
+        targetUser.balance += amount;
+        
+        data.users[userId] = user;
+        data.users[targetId] = targetUser;
+        await saveData(data);
+        
+        await sendMessage(BOT_TOKEN, ch
