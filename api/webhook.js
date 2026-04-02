@@ -1,11 +1,11 @@
-// api/webhook.js — полная версия с детским мылом и Пидиди
+// api/webhook.js — полная исправленная версия
 const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
 const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
 
 const ALLOWED_CHAT_ID = -1003608269453;
 const GROUP_INVITE_LINK = 'https://t.me/epstainisland';
 
-// Константы вора Пидиди (без пробелов!)
+// Константы вора Пидиди
 const PIDIDI_STEAL_CHANCE = 5;  // 5% шанс кражи
 const PIDIDI_STEAL_MIN = 1;
 const PIDIDI_STEAL_MAX = 10;
@@ -50,7 +50,7 @@ module.exports = async (req, res) => {
             
             await editMessage(BOT_TOKEN, chatId, messageId,
               `⚔️ *ДУЭЛЬ НАЧАЛАСЬ!* ⚔️\n\n${duel.player1Name} VS ${username}\n\n🎯 *Базовый шанс: 20%*\n🎯 Каждый "Прицел" +10% (макс 70%)\n💰 При попадании забираешь 3 детского мыла\n\n👉 *Ход ${duel.player1Name}*`,
-              getDuelKeyboard(duel.player1Id, duel.player2Id, duel.turn, duel.aim1, duel.aim2)
+              getDuelKeyboard(duel.id, duel.player1Id, duel.player2Id, duel.turn, duel.aim1, duel.aim2)
             );
             
             await answerCallback(callback.id);
@@ -80,7 +80,7 @@ module.exports = async (req, res) => {
           const duel = duels[duelId];
           
           if (!duel || duel.status !== 'active') {
-            await answerCallback(callback.id, '❌ Дуэль уже завершена!');
+            await answerCallback(callback.id, '❌ Дуэль уже завершена или отменена!');
             await deleteMessage(BOT_TOKEN, chatId, messageId);
             return res.status(200).json({ ok: true });
           }
@@ -110,7 +110,7 @@ module.exports = async (req, res) => {
             
             await editMessage(BOT_TOKEN, chatId, messageId,
               `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n🎯 *Шанс ${username}: ${20 + aimBonus}%* (база 20% + ${aimBonus}% от прицела)\n💰 При попадании забираешь 3 детского мыла\n\n👉 *Ход ${username}*`,
-              getDuelKeyboard(duel.player1Id, duel.player2Id, duel.turn, duel.aim1, duel.aim2)
+              getDuelKeyboard(duel.id, duel.player1Id, duel.player2Id, duel.turn, duel.aim1, duel.aim2)
             );
             
             await answerCallback(callback.id, `🎯 Прицел +10%! Шанс: ${20 + aimBonus}%`);
@@ -126,7 +126,7 @@ module.exports = async (req, res) => {
             
             await editMessage(BOT_TOKEN, chatId, messageId,
               `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n🎯 *Шанс ${username}: 20%* (прицел сброшен)\n💰 При попадании забираешь 3 детского мыла\n\n👉 *Ход ${username}*`,
-              getDuelKeyboard(duel.player1Id, duel.player2Id, duel.turn, duel.aim1, duel.aim2)
+              getDuelKeyboard(duel.id, duel.player1Id, duel.player2Id, duel.turn, duel.aim1, duel.aim2)
             );
             
             await answerCallback(callback.id, `🔫 Прицел сброшен! Шанс: 20%`);
@@ -182,7 +182,7 @@ module.exports = async (req, res) => {
               
               await editMessage(BOT_TOKEN, chatId, messageId,
                 `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n${resultText}\n🎯 Шанс ${duel.turn === duel.player1Id ? duel.player1Name : duel.player2Name}: 20%`,
-                getDuelKeyboard(duel.player1Id, duel.player2Id, duel.turn, duel.aim1, duel.aim2)
+                getDuelKeyboard(duel.id, duel.player1Id, duel.player2Id, duel.turn, duel.aim1, duel.aim2)
               );
               await answerCallback(callback.id, `💨 ПРОМАХ! Ход переходит ${targetName}`);
             }
@@ -265,7 +265,7 @@ module.exports = async (req, res) => {
           }
         }
         
-        const duelId = `duel_${Date.now()}`;
+        const duelId = `duel_${Date.now()}_${userId}`;
         
         duels[duelId] = {
           id: duelId,
@@ -303,21 +303,11 @@ module.exports = async (req, res) => {
       else if (cleanText === '/farm') {
         const now = Math.floor(Date.now() / 1000);
         
-       if (user.lastFarm && (now - user.lastFarm) < 3600) {
-  const remaining = 3600 - (now - user.lastFarm);
-  const minutes = Math.floor(remaining / 60);
-  const seconds = remaining % 60;
-  
-  let timeText = '';
-  if (minutes > 0) {
-    timeText = `${minutes} минут`;
-    if (seconds > 0) timeText += ` ${seconds} секунд`;
-  } else {
-    timeText = `${seconds} секунд`;
-  }
-  
-  await sendMessage(BOT_TOKEN, chatId, `⏰ ${username}, подожди еще ${timeText}!`);
-} else {
+        if (user.lastFarm && (now - user.lastFarm) < 3600) {
+          const remaining = 3600 - (now - user.lastFarm);
+          const minutes = Math.ceil(remaining / 60);
+          await sendMessage(BOT_TOKEN, chatId, `⏰ ${username}, подожди еще ${minutes} минут!`);
+        } else {
           const soap = Math.floor(Math.random() * 30) + 1;
           user.balance += soap;
           user.lastFarm = now;
@@ -393,18 +383,18 @@ module.exports = async (req, res) => {
 
 // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 
-function getDuelKeyboard(player1Id, player2Id, turnId, aim1, aim2) {
+function getDuelKeyboard(duelId, player1Id, player2Id, turnId, aim1, aim2) {
   const isPlayer1Turn = (turnId === player1Id);
   const currentAim = isPlayer1Turn ? aim1 : aim2;
   
   return {
     inline_keyboard: [
       [
-        { text: `🎯 ПРИЦЕЛ (+10%) [${currentAim}/50]`, callback_data: `duel_action_aim_${Date.now()}` },
-        { text: `🔫 СБРОСИТЬ`, callback_data: `duel_action_unaim_${Date.now()}` }
+        { text: `🎯 ПРИЦЕЛ (+10%) [${currentAim}/50]`, callback_data: `duel_action_aim_${duelId}` },
+        { text: `🔫 СБРОСИТЬ`, callback_data: `duel_action_unaim_${duelId}` }
       ],
       [
-        { text: `💥 ВЫСТРЕЛИТЬ (${20 + currentAim}%)`, callback_data: `duel_action_shoot_${Date.now()}` }
+        { text: `💥 ВЫСТРЕЛИТЬ (${20 + currentAim}%)`, callback_data: `duel_action_shoot_${duelId}` }
       ]
     ]
   };
