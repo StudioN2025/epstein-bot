@@ -1,4 +1,4 @@
-// api/webhook.js — ФИНАЛЬНАЯ РАБОЧАЯ ВЕРСИЯ
+// api/webhook.js — с детьми как второй валютой
 const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
 const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
 
@@ -8,6 +8,8 @@ const GROUP_INVITE_LINK = 'https://t.me/epstainisland';
 const PIDIDI_STEAL_CHANCE = 5;
 const PIDIDI_STEAL_MIN = 1;
 const PIDIDI_STEAL_MAX = 10;
+
+const CHILD_COST = 100; // 1 ребенок = 100 мыла
 
 let duels = {};
 
@@ -27,7 +29,7 @@ module.exports = async (req, res) => {
     try {
       const update = req.body;
       
-      // ========== ОБРАБОТКА КНОПОК ==========
+      // ========== КНОПКИ ==========
       if (update.callback_query) {
         const callback = update.callback_query;
         const cbData = callback.data;
@@ -153,11 +155,13 @@ module.exports = async (req, res) => {
             let data = await loadData();
             if (!data.users) data.users = {};
             
-            let targetData = data.users[targetId] || { balance: 0, username: targetName, lastFarm: 0, mutedUntil: 0 };
-            let shooterData = data.users[userId] || { balance: 0, username: shooterName, lastFarm: 0, mutedUntil: 0 };
+            let targetData = data.users[targetId] || { balance: 0, children: 0, username: targetName, lastFarm: 0, mutedUntil: 0 };
+            let shooterData = data.users[userId] || { balance: 0, children: 0, username: shooterName, lastFarm: 0, mutedUntil: 0 };
             
             targetData.username = targetName;
             shooterData.username = shooterName;
+            if (!targetData.children) targetData.children = 0;
+            if (!shooterData.children) shooterData.children = 0;
             
             resultText = `🎲 *${shooterName} стреляет!* Точность: ${hitChance}%, выпало: ${hitRoll.toFixed(1)}%\n\n`;
             
@@ -172,7 +176,7 @@ module.exports = async (req, res) => {
               } else {
                 targetData.balance -= 3;
                 shooterData.balance += 3;
-                resultText += `🧼 ${shooterName} забрал 3 мыла!\n📊 ${shooterName}: ${shooterData.balance} 🧼\n📊 ${targetName}: ${targetData.balance} 🧼`;
+                resultText += `🧼 ${shooterName} забрал 3 мыла!\n📊 ${shooterName}: ${shooterData.balance} 🧼, ${shooterData.children} 👶\n📊 ${targetName}: ${targetData.balance} 🧼, ${targetData.children} 👶`;
               }
               
               resultText += `\n\n🏆 *ПОБЕДИТЕЛЬ: ${shooterName}* 🏆`;
@@ -244,7 +248,8 @@ module.exports = async (req, res) => {
       let data = await loadData();
       if (!data.users) data.users = {};
       
-      let user = data.users[userId] || { balance: 0, lastFarm: 0, username: username, mutedUntil: 0 };
+      let user = data.users[userId] || { balance: 0, children: 0, username: username, lastFarm: 0, mutedUntil: 0 };
+      if (!user.children) user.children = 0;
       
       if (user.mutedUntil && user.mutedUntil > Math.floor(Date.now() / 1000)) {
         const remaining = user.mutedUntil - Math.floor(Date.now() / 1000);
@@ -252,8 +257,52 @@ module.exports = async (req, res) => {
         return res.status(200).json({ ok: true });
       }
       
+      // /BUYCHILD - обменять 100 мыла на ребенка
+      if (cleanText === '/buychild' || cleanText === '/buy_child') {
+        if (user.balance >= CHILD_COST) {
+          user.balance -= CHILD_COST;
+          user.children += 1;
+          data.users[userId] = user;
+          await saveData(data);
+          await sendMessage(BOT_TOKEN, chatId, 
+            `👶 *ТЫ КУПИЛ РЕБЕНКА!* 👶\n\n${username} обменял 100 детского мыла на ребенка!\n\n📊 Теперь у тебя:\n🧼 Мыла: ${user.balance}\n👶 Детей: ${user.children}\n\n🍼 *Поздравляем с пополнением!* 🍼`
+          );
+        } else {
+          const needed = CHILD_COST - user.balance;
+          await sendMessage(BOT_TOKEN, chatId, 
+            `❌ ${username}, у тебя не хватает мыла для покупки ребенка!\n\nНужно: ${CHILD_COST} 🧼\nЕсть: ${user.balance} 🧼\nНе хватает: ${needed} 🧼\n\nПродолжай фармить! /farm`
+          );
+        }
+      }
+      
+      // /CHILDREN - показать сколько детей
+      else if (cleanText === '/children') {
+        await sendMessage(BOT_TOKEN, chatId, 
+          `👶 *ДЕТИ ${username}* 👶\n\n🧼 Мыла: ${user.balance}\n👶 Детей: ${user.children}\n\n1 ребенок = 100 мыла\nКупить ребенка: /buychild`
+        );
+      }
+      
+      // /TOPCHILDREN - топ по детям
+      else if (cleanText === '/topchildren') {
+        const users = Object.values(data.users);
+        const sorted = users.sort((a, b) => (b.children || 0) - (a.children || 0)).slice(0, 10);
+        
+        if (sorted.length === 0 || sorted[0].children === 0) {
+          await sendMessage(BOT_TOKEN, chatId, '👶 Топ детей пуст! Купи ребенка через /buychild');
+        } else {
+          let reply = '👶 ТОП ДЕТОВОДОВ ОСТРОВА 👶\n\n';
+          sorted.forEach((u, i) => {
+            const childrenCount = u.children || 0;
+            if (childrenCount > 0) {
+              reply += `${i+1}. ${u.username} — ${childrenCount} 👶\n`;
+            }
+          });
+          await sendMessage(BOT_TOKEN, chatId, reply);
+        }
+      }
+      
       // DUEL
-      if (cleanText.startsWith('/duel')) {
+      else if (cleanText.startsWith('/duel')) {
         const parts = rawText.split(' ');
         let targetUsername = parts[1];
         
@@ -311,7 +360,7 @@ module.exports = async (req, res) => {
         };
         
         await sendMessage(BOT_TOKEN, chatId,
-          `⚔️ *ДУЭЛЬ!* ⚔️\n\n${username} вызывает @${opponentName}!\n\n💰 У ${opponentName}: ${opponent.balance} 🧼\n🏆 Победитель забирает 3 мыла!\n\n⏳ 60 секунд на принятие!`,
+          `⚔️ *ДУЭЛЬ!* ⚔️\n\n${username} вызывает @${opponentName}!\n\n💰 У ${opponentName}: ${opponent.balance} 🧼, ${opponent.children || 0} 👶\n🏆 Победитель забирает 3 мыла!\n\n⏳ 60 секунд на принятие!`,
           keyboard
         );
         
@@ -336,8 +385,9 @@ module.exports = async (req, res) => {
           user.balance += soap;
           user.lastFarm = now;
           user.username = username;
+          if (!user.children) user.children = 0;
           
-          let message = `🧼 ${username}, +${soap} детского мыла!\n📊 Баланс: ${user.balance} 🧼`;
+          let message = `🧼 ${username}, +${soap} детского мыла!\n📊 Баланс: ${user.balance} 🧼, ${user.children} 👶\n\n👶 1 ребенок = 100 мыла. Купить: /buychild`;
           
           const roll = Math.random() * 100;
           if (roll < PIDIDI_STEAL_CHANCE) {
@@ -345,10 +395,10 @@ module.exports = async (req, res) => {
             
             if (user.balance - stolen <= 0) {
               user.balance = 0;
-              message = `😡👶 *ПИДИДИ УКРАЛ ВСЁ!* 👶😡\n\n${username}, Пидиди украл всё мыло!\n🍼 "Детское мыло только для детей!" 👶`;
+              message = `😡👶 *ПИДИДИ УКРАЛ ВСЁ!* 👶😡\n\n${username}, Пидиди украл всё мыло!\n📊 Осталось: ${user.balance} 🧼, ${user.children} 👶\n🍼 "Детское мыло только для детей!" 👶`;
             } else {
               user.balance -= stolen;
-              message = `😡👶 *ПИДИДИ УКРАЛ МЫЛО!* 👶😡\n\n${username}, Пидиди украл ${stolen} мыла!\n📊 Осталось: ${user.balance} 🧼`;
+              message = `😡👶 *ПИДИДИ УКРАЛ МЫЛО!* 👶😡\n\n${username}, Пидиди украл ${stolen} мыла!\n📊 Осталось: ${user.balance} 🧼, ${user.children} 👶`;
             }
           }
           
@@ -360,7 +410,7 @@ module.exports = async (req, res) => {
       
       // BALANCE
       else if (cleanText === '/balance') {
-        await sendMessage(BOT_TOKEN, chatId, `📊 ${username}, у тебя ${user.balance} 🧼 детского мыла`);
+        await sendMessage(BOT_TOKEN, chatId, `📊 ${username}, у тебя:\n🧼 Мыла: ${user.balance}\n👶 Детей: ${user.children || 0}\n\nКупить ребенка: /buychild (100 мыла)`);
       }
       
       // TOP
@@ -373,7 +423,7 @@ module.exports = async (req, res) => {
         } else {
           let reply = '🏆 ТОП МЫЛОВАРОВ 🧼\n\n';
           sorted.forEach((u, i) => {
-            reply += `${i+1}. ${u.username} — ${u.balance} 🧼\n`;
+            reply += `${i+1}. ${u.username} — ${u.balance} 🧼 (👶 ${u.children || 0})\n`;
           });
           await sendMessage(BOT_TOKEN, chatId, reply);
         }
@@ -383,12 +433,17 @@ module.exports = async (req, res) => {
       else if (cleanText === '/start') {
         await sendMessage(BOT_TOKEN, chatId,
           `🧼 *Остров Эпштейна* 🏝️\n\nПривет, ${username}!\n\n` +
+          `🎯 *Команды:*\n` +
           `/farm — фарм мыла (1-30, раз в час)\n` +
-          `/balance — баланс\n` +
-          `/top — топ\n` +
-          `/duel @username — дуэль\n\n` +
+          `/balance — баланс (мыло + дети)\n` +
+          `/top — топ по мылу\n` +
+          `/children — показать детей\n` +
+          `/topchildren — топ по детям\n` +
+          `/buychild — купить ребенка (100 мыла)\n` +
+          `/duel @username — дуэль на 3 мыла\n\n` +
           `⚠️ Пидиди крадет мыло с шансом 5%!\n` +
-          `⚔️ В дуэли: 1 действие за ход. Макс точность 50%. Прицел +10%, сбить прицел - обнулить врагу.`
+          `👶 1 ребенок = 100 мыла\n` +
+          `⚔️ В дуэли: 1 действие за ход. Макс точность 50%.`
         );
       }
       
@@ -445,34 +500,4 @@ async function sendMessage(token, chatId, text, keyboard = null) {
 }
 
 async function editMessage(token, chatId, messageId, text, keyboard = null) {
-  const url = `https://api.telegram.org/bot${token}/editMessageText`;
-  const body = { chat_id: chatId, message_id: messageId, text, parse_mode: 'Markdown' };
-  if (keyboard) body.reply_markup = keyboard;
-  
-  await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-}
-
-async function deleteMessage(token, chatId, messageId) {
-  const url = `https://api.telegram.org/bot${token}/deleteMessage`;
-  await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, message_id: messageId })
-  });
-}
-
-async function answerCallback(callbackId, text = null) {
-  const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/answerCallbackQuery`;
-  const body = { callback_query_id: callbackId };
-  if (text) body.text = text;
-  
-  await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-      }
+  con
