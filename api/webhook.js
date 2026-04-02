@@ -303,11 +303,21 @@ module.exports = async (req, res) => {
       else if (cleanText === '/farm') {
         const now = Math.floor(Date.now() / 1000);
         
-        if (user.lastFarm && (now - user.lastFarm) < 3600) {
-          const remaining = 3600 - (now - user.lastFarm);
-          const minutes = Math.floor(remaining / 60);
-          await sendMessage(BOT_TOKEN, chatId, `⏰ ${username}, подожди еще ${minutes} минут!`);
-        } else {
+       if (user.lastFarm && (now - user.lastFarm) < 3600) {
+  const remaining = 3600 - (now - user.lastFarm);
+  const minutes = Math.floor(remaining / 60);
+  const seconds = remaining % 60;
+  
+  let timeText = '';
+  if (minutes > 0) {
+    timeText = `${minutes} минут`;
+    if (seconds > 0) timeText += ` ${seconds} секунд`;
+  } else {
+    timeText = `${seconds} секунд`;
+  }
+  
+  await sendMessage(BOT_TOKEN, chatId, `⏰ ${username}, подожди еще ${timeText}!`);
+} else {
           const soap = Math.floor(Math.random() * 30) + 1;
           user.balance += soap;
           user.lastFarm = now;
