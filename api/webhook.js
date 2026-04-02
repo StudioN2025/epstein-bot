@@ -1,4 +1,4 @@
-// api/webhook.js — дуэль ПОЧИНЕНА
+// api/webhook.js — дуэль с 1 действием за ход
 const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
 const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
 
@@ -47,20 +47,23 @@ module.exports = async (req, res) => {
             duel.aim1 = 0;
             duel.aim2 = 0;
             
+            const currentPlayer = duel.turn === duel.player1Id ? duel.player1Name : duel.player2Name;
+            const currentAim = duel.turn === duel.player1Id ? duel.aim1 : duel.aim2;
+            
             const keyboard = {
               inline_keyboard: [
                 [
-                  { text: `🎯 ПРИЦЕЛ (+10%) [0/50]`, callback_data: `aim_${duelId}` },
-                  { text: `🔫 СБРОСИТЬ`, callback_data: `unaim_${duelId}` }
+                  { text: `🎯 ПРИЦЕЛИТЬСЯ (+10%) [${currentAim}/50]`, callback_data: `aim_${duelId}` },
+                  { text: `🔫 СБИТЬ ПРИЦЕЛ`, callback_data: `break_${duelId}` }
                 ],
                 [
-                  { text: `💥 ВЫСТРЕЛИТЬ (20%)`, callback_data: `shoot_${duelId}` }
+                  { text: `💥 ВЫСТРЕЛИТЬ (${20 + currentAim}%)`, callback_data: `shoot_${duelId}` }
                 ]
               ]
             };
             
             await editMessage(BOT_TOKEN, chatId, messageId,
-              `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n🎯 Шанс: 20%\n💰 Ставка: 3 мыла\n\n👉 Ход: *${duel.player1Name}*`,
+              `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n🎯 Твой шанс: ${20 + currentAim}%\n💰 Ставка: 3 мыла\n\n👉 *ХОД: ${currentPlayer}*\n(Выбери одно действие)`,
               keyboard
             );
             await answerCallback(callback.id);
@@ -83,12 +86,12 @@ module.exports = async (req, res) => {
         }
         
         // ========== ДЕЙСТВИЯ В ДУЭЛИ ==========
-        else if (cbData.startsWith('aim_') || cbData.startsWith('unaim_') || cbData.startsWith('shoot_')) {
+        else if (cbData.startsWith('aim_') || cbData.startsWith('break_') || cbData.startsWith('shoot_')) {
           const [action, duelId] = cbData.split('_');
           const duel = duels[duelId];
           
           if (!duel || duel.status !== 'active') {
-            await answerCallback(callback.id, '❌ Дуэль не найдена или уже закончена');
+            await answerCallback(callback.id, '❌ Дуэль не найдена');
             await deleteMessage(BOT_TOKEN, chatId, messageId);
             return res.status(200).json({ ok: true });
           }
@@ -100,12 +103,15 @@ module.exports = async (req, res) => {
           }
           
           const isPlayer1 = (userId === duel.player1Id);
-          let aimBonus = isPlayer1 ? duel.aim1 : duel.aim2;
+          let resultText = '';
+          let duelEnded = false;
           
-          // AIM
+          // 1. ПРИЦЕЛИТЬСЯ (увеличиваю свой прицел)
           if (action === 'aim') {
+            let aimBonus = isPlayer1 ? duel.aim1 : duel.aim2;
+            
             if (aimBonus >= 50) {
-              await answerCallback(callback.id, '🎯 Уже максимум!');
+              await answerCallback(callback.id, '🎯 Уже максимальный прицел!');
               return res.status(200).json({ ok: true });
             }
             
@@ -113,51 +119,29 @@ module.exports = async (req, res) => {
             if (isPlayer1) duel.aim1 = aimBonus;
             else duel.aim2 = aimBonus;
             
-            const keyboard = {
-              inline_keyboard: [
-                [
-                  { text: `🎯 ПРИЦЕЛ (+10%) [${aimBonus}/50]`, callback_data: `aim_${duelId}` },
-                  { text: `🔫 СБРОСИТЬ`, callback_data: `unaim_${duelId}` }
-                ],
-                [
-                  { text: `💥 ВЫСТРЕЛИТЬ (${20 + aimBonus}%)`, callback_data: `shoot_${duelId}` }
-                ]
-              ]
-            };
+            resultText = `🎯 ${username} прицелился! +10% к шансу. Теперь шанс: ${20 + aimBonus}%`;
             
-            await editMessage(BOT_TOKEN, chatId, messageId,
-              `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n🎯 Шанс: ${20 + aimBonus}%\n💰 Ставка: 3 мыла\n\n👉 Ход: *${username}*`,
-              keyboard
-            );
-            await answerCallback(callback.id, `🎯 Прицел +10%! Шанс: ${20 + aimBonus}%`);
+            // Меняем ход
+            duel.turn = isPlayer1 ? duel.player2Id : duel.player1Id;
           }
           
-          // UNAIM
-          else if (action === 'unaim') {
-            if (isPlayer1) duel.aim1 = 0;
-            else duel.aim2 = 0;
+          // 2. СБИТЬ ПРИЦЕЛ (обнуляю прицел у противника)
+          else if (action === 'break') {
+            if (isPlayer1) {
+              duel.aim2 = 0;
+              resultText = `🔫 ${username} сбил прицел у ${duel.player2Name}! Шанс ${duel.player2Name} вернулся к 20%`;
+            } else {
+              duel.aim1 = 0;
+              resultText = `🔫 ${username} сбил прицел у ${duel.player1Name}! Шанс ${duel.player1Name} вернулся к 20%`;
+            }
             
-            const keyboard = {
-              inline_keyboard: [
-                [
-                  { text: `🎯 ПРИЦЕЛ (+10%) [0/50]`, callback_data: `aim_${duelId}` },
-                  { text: `🔫 СБРОСИТЬ`, callback_data: `unaim_${duelId}` }
-                ],
-                [
-                  { text: `💥 ВЫСТРЕЛИТЬ (20%)`, callback_data: `shoot_${duelId}` }
-                ]
-              ]
-            };
-            
-            await editMessage(BOT_TOKEN, chatId, messageId,
-              `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n🎯 Шанс: 20%\n💰 Ставка: 3 мыла\n\n👉 Ход: *${username}*`,
-              keyboard
-            );
-            await answerCallback(callback.id, `🔫 Прицел сброшен! Шанс: 20%`);
+            // Меняем ход
+            duel.turn = isPlayer1 ? duel.player2Id : duel.player1Id;
           }
           
-          // SHOOT
+          // 3. ВЫСТРЕЛИТЬ
           else if (action === 'shoot') {
+            const aimBonus = isPlayer1 ? duel.aim1 : duel.aim2;
             const hitChance = 20 + aimBonus;
             const hit = Math.random() * 100 < hitChance;
             
@@ -172,7 +156,7 @@ module.exports = async (req, res) => {
               let targetData = data.users[targetId] || { balance: 0, username: targetName };
               let shooterData = data.users[userId] || { balance: 0, username: shooterName };
               
-              let resultText = `💥 *ПОПАДАНИЕ!* 💥\n\n${shooterName} попал в ${targetName}!\n`;
+              resultText = `💥 *ПОПАДАНИЕ!* 💥\n\n${shooterName} попал в ${targetName}!\n`;
               
               if (targetData.balance < 3) {
                 targetData.mutedUntil = Math.floor(Date.now() / 1000) + 60;
@@ -190,39 +174,39 @@ module.exports = async (req, res) => {
               data.users[userId] = shooterData;
               await saveData(data);
               
-              await editMessage(BOT_TOKEN, chatId, messageId, resultText, null);
-              await answerCallback(callback.id, `💥 ПОПАДАНИЕ! Ты победил!`);
+              duelEnded = true;
               delete duels[duelId];
             } else {
-              // Промах — ход сопернику
-              if (isPlayer1) {
-                duel.aim1 = 0;
-                duel.turn = duel.player2Id;
-              } else {
-                duel.aim2 = 0;
-                duel.turn = duel.player1Id;
-              }
-              
-              const nextName = duel.turn === duel.player1Id ? duel.player1Name : duel.player2Name;
-              
-              const keyboard = {
-                inline_keyboard: [
-                  [
-                    { text: `🎯 ПРИЦЕЛ (+10%) [0/50]`, callback_data: `aim_${duelId}` },
-                    { text: `🔫 СБРОСИТЬ`, callback_data: `unaim_${duelId}` }
-                  ],
-                  [
-                    { text: `💥 ВЫСТРЕЛИТЬ (20%)`, callback_data: `shoot_${duelId}` }
-                  ]
-                ]
-              };
-              
-              await editMessage(BOT_TOKEN, chatId, messageId,
-                `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n💨 *ПРОМАХ!* ${shooterName} промахнулся!\n\n🎯 Шанс: 20%\n💰 Ставка: 3 мыла\n\n👉 Ход: *${nextName}*`,
-                keyboard
-              );
-              await answerCallback(callback.id, `💨 ПРОМАХ! Ход переходит ${nextName}`);
+              resultText = `💨 *ПРОМАХ!* 💨\n\n${shooterName} промахнулся!`;
+              duel.turn = isPlayer1 ? duel.player2Id : duel.player1Id;
             }
+          }
+          
+          if (duelEnded) {
+            await editMessage(BOT_TOKEN, chatId, messageId, resultText, null);
+            await answerCallback(callback.id, resultText.includes('ПОПАДАНИЕ') ? '💥 Ты победил!' : '❌ Ты проиграл');
+          } else {
+            const nextPlayerId = duel.turn;
+            const nextPlayerName = nextPlayerId === duel.player1Id ? duel.player1Name : duel.player2Name;
+            const nextAim = nextPlayerId === duel.player1Id ? duel.aim1 : duel.aim2;
+            
+            const keyboard = {
+              inline_keyboard: [
+                [
+                  { text: `🎯 ПРИЦЕЛИТЬСЯ (+10%) [${nextAim}/50]`, callback_data: `aim_${duelId}` },
+                  { text: `🔫 СБИТЬ ПРИЦЕЛ`, callback_data: `break_${duelId}` }
+                ],
+                [
+                  { text: `💥 ВЫСТРЕЛИТЬ (${20 + nextAim}%)`, callback_data: `shoot_${duelId}` }
+                ]
+              ]
+            };
+            
+            await editMessage(BOT_TOKEN, chatId, messageId,
+              `⚔️ *ДУЭЛЬ!* ⚔️\n\n${duel.player1Name} VS ${duel.player2Name}\n\n${resultText}\n\n🎯 Шанс ${nextPlayerName}: ${20 + nextAim}%\n💰 Ставка: 3 мыла\n\n👉 *ХОД: ${nextPlayerName}*`,
+              keyboard
+            );
+            await answerCallback(callback.id, '✅ Ход передан');
           }
         }
         
@@ -286,7 +270,6 @@ module.exports = async (req, res) => {
         
         const opponent = data.users[opponentId] || { balance: 0 };
         
-        // Проверяем нет ли уже дуэли
         for (const duel of Object.values(duels)) {
           if (duel.player1Id === userId || duel.player2Id === userId) {
             await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, ты уже в дуэли!`);
@@ -393,7 +376,7 @@ module.exports = async (req, res) => {
           `/top — топ\n` +
           `/duel @username — дуэль\n\n` +
           `⚠️ Пидиди крадет мыло с шансом 5%!\n` +
-          `⚔️ В дуэли шанс 20%, прицел +10% за раз (макс +50%).`
+          `⚔️ В дуэли: 1 действие за ход. Прицел увеличивает шанс, "Сбить прицел" обнуляет врагу.`
         );
       }
       
