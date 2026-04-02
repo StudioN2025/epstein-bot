@@ -1,5 +1,6 @@
-// api/webhook.js — исправленная версия
-const GOOGLE_SHEET_ID = '1AtFXRO85k3E7TyJ3GW7kogiejMUhFpeLXHgMcoARNSw';
+// api/webhook.js — финальная версия с JSONBin
+const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
+const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
 
 module.exports = async (req, res) => {
   const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -18,45 +19,49 @@ module.exports = async (req, res) => {
         const username = update.message.from.username || update.message.from.first_name;
         const text = update.message.text;
         
-        // Читаем данные из таблицы
-        let userBalance = await getBalance(userId);
-        let lastFarm = await getLastFarm(userId);
+        // Загружаем данные
+        let data = await loadData();
+        if (!data.users) data.users = {};
+        
+        const user = data.users[userId] || { balance: 0, lastFarm: 0, username: username };
         
         // /farm
         if (text === '/farm') {
           const now = Math.floor(Date.now() / 1000);
           
-          if (lastFarm && (now - lastFarm) < 3600) {
-            const remaining = 3600 - (now - lastFarm);
+          if (user.lastFarm && (now - user.lastFarm) < 3600) {
+            const remaining = 3600 - (now - user.lastFarm);
             const minutes = Math.floor(remaining / 60);
             await sendMessage(BOT_TOKEN, chatId, `⏰ Подожди еще ${minutes} минут!`);
           } else {
             const soap = Math.floor(Math.random() * 30) + 1;
-            const newBalance = (userBalance || 0) + soap;
+            user.balance += soap;
+            user.lastFarm = now;
+            user.username = username;
             
-            // Сохраняем в таблицу
-            await saveToSheet(userId, username, newBalance, now);
+            data.users[userId] = user;
+            await saveData(data);
             
-            await sendMessage(BOT_TOKEN, chatId, `🧼 +${soap} мыла!\n📊 Новый баланс: ${newBalance} 🧼`);
+            await sendMessage(BOT_TOKEN, chatId, `🧼 +${soap} мыла!\n📊 Баланс: ${user.balance} 🧼`);
           }
         }
         
         // /balance
         else if (text === '/balance') {
-          const balance = await getBalance(userId) || 0;
-          await sendMessage(BOT_TOKEN, chatId, `📊 ${username}, у тебя ${balance} 🧼`);
+          await sendMessage(BOT_TOKEN, chatId, `📊 ${username}, у тебя ${user.balance} 🧼`);
         }
         
         // /top
         else if (text === '/top') {
-          const topUsers = await getTopUsers();
+          const users = Object.values(data.users);
+          const sorted = users.sort((a, b) => b.balance - a.balance).slice(0, 10);
           
-          if (topUsers.length === 0) {
+          if (sorted.length === 0) {
             await sendMessage(BOT_TOKEN, chatId, 'Топ пуст! Нафарми первый 🧼');
           } else {
             let reply = '🏆 ТОП МЫЛОВАРОВ 🧼\n\n';
-            topUsers.forEach((user, i) => {
-              reply += `${i+1}. ${user.username} — ${user.balance} 🧼\n`;
+            sorted.forEach((u, i) => {
+              reply += `${i+1}. ${u.username} — ${u.balance} 🧼\n`;
             });
             await sendMessage(BOT_TOKEN, chatId, reply);
           }
@@ -65,10 +70,7 @@ module.exports = async (req, res) => {
         // /start
         else if (text === '/start') {
           await sendMessage(BOT_TOKEN, chatId, 
-            `Привет, ${username}! 🧼\n\n` +
-            `/farm — нафармить мыло (1-30, раз в час)\n` +
-            `/balance — проверить баланс\n` +
-            `/top — топ игроков`
+            `Привет, ${username}! 🧼\n\n/farm — нафармить мыло (1-30, раз в час)\n/balance — баланс\n/top — топ игроков`
           );
         }
       }
@@ -83,95 +85,32 @@ module.exports = async (req, res) => {
   return res.status(405).json({ error: 'Method not allowed' });
 };
 
-// ========== ФУНКЦИИ GOOGLE SHEETS (через sheety.co) ==========
-
-async function getBalance(userId) {
+// Функции работы с JSONBin
+async function loadData() {
   try {
-    const response = await fetch(`https://api.sheety.co/${GOOGLE_SHEET_ID}/sheet1`);
+    const response = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`, {
+      headers: { 'X-Master-Key': JSONBIN_API_KEY }
+    });
     const data = await response.json();
-    const sheet1 = data.sheet1 || [];
-    
-    const user = sheet1.find(row => row.userId == userId);
-    return user ? parseInt(user.balance) : 0;
+    return data.record;
   } catch (error) {
-    console.error('Get balance error:', error);
-    return 0;
+    console.error('Load error:', error);
+    return { users: {} };
   }
 }
 
-async function getLastFarm(userId) {
+async function saveData(data) {
   try {
-    const response = await fetch(`https://api.sheety.co/${GOOGLE_SHEET_ID}/sheet1`);
-    const data = await response.json();
-    const sheet1 = data.sheet1 || [];
-    
-    const user = sheet1.find(row => row.userId == userId);
-    return user ? parseInt(user.lastFarm) : 0;
-  } catch (error) {
-    console.error('Get lastFarm error:', error);
-    return 0;
-  }
-}
-
-async function saveToSheet(userId, username, balance, lastFarm) {
-  try {
-    // Сначала получаем все данные
-    const response = await fetch(`https://api.sheety.co/${GOOGLE_SHEET_ID}/sheet1`);
-    const data = await response.json();
-    const sheet1 = data.sheet1 || [];
-    
-    const existingUser = sheet1.find(row => row.userId == userId);
-    
-    if (existingUser) {
-      // Обновляем существующего пользователя
-      await fetch(`https://api.sheety.co/${GOOGLE_SHEET_ID}/sheet1/${existingUser.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sheet1: {
-            userId: userId,
-            username: username,
-            balance: balance,
-            lastFarm: lastFarm
-          }
-        })
-      });
-    } else {
-      // Добавляем нового пользователя
-      await fetch(`https://api.sheety.co/${GOOGLE_SHEET_ID}/sheet1`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sheet1: {
-            userId: userId,
-            username: username,
-            balance: balance,
-            lastFarm: lastFarm
-          }
-        })
-      });
-    }
+    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JSONBIN_API_KEY
+      },
+      body: JSON.stringify(data)
+    });
   } catch (error) {
     console.error('Save error:', error);
-  }
-}
-
-async function getTopUsers() {
-  try {
-    const response = await fetch(`https://api.sheety.co/${GOOGLE_SHEET_ID}/sheet1`);
-    const data = await response.json();
-    const sheet1 = data.sheet1 || [];
-    
-    return sheet1
-      .map(row => ({
-        username: row.username,
-        balance: parseInt(row.balance) || 0
-      }))
-      .sort((a, b) => b.balance - a.balance)
-      .slice(0, 10);
-  } catch (error) {
-    console.error('Get top error:', error);
-    return [];
   }
 }
 
