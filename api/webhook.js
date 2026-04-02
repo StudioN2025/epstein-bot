@@ -1,6 +1,10 @@
-// api/webhook.js — финальная версия с JSONBin
+// api/webhook.js — версия с привязкой к одной группе
 const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
 const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
+
+// НАСТРОЙКИ
+const ALLOWED_CHAT_ID = -1003608269453; // 👈 СЮДА ВСТАВИТЬ ID ГРУППЫ (см. инструкцию ниже)
+const GROUP_INVITE_LINK = 'https://t.me/epstainisland';
 
 module.exports = async (req, res) => {
   const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -18,8 +22,27 @@ module.exports = async (req, res) => {
         const userId = update.message.from.id;
         const username = update.message.from.username || update.message.from.first_name;
         const text = update.message.text;
+        const chatType = update.message.chat.type;
         
-        // Загружаем данные
+        // ========== ПРОВЕРКА ГРУППЫ ==========
+        // Если это НЕ разрешенная группа
+        if (chatId !== ALLOWED_CHAT_ID) {
+          let reply = '';
+          
+          if (chatType === 'private') {
+            // Личное сообщение
+            reply = `🧼 *Эпштейн бот* работает только на нашем острове!\n\nПрисоединяйся к нам: ${GROUP_INVITE_LINK}\n\nТам можно фармить мыло и стать топ-мыловаром! 🧼🏆`;
+          } else {
+            // Другая группа
+            reply = `🧼 *Эпштейн бот* не работает в этой группе!\n\nПрисоединяйся к нашему острову: ${GROUP_INVITE_LINK}\n\nТам можно фармить мыло! 🧼`;
+          }
+          
+          await sendMessage(BOT_TOKEN, chatId, reply);
+          return res.status(200).json({ ok: true });
+        }
+        // =====================================
+        
+        // Загружаем данные (только для разрешенной группы)
         let data = await loadData();
         if (!data.users) data.users = {};
         
@@ -70,7 +93,7 @@ module.exports = async (req, res) => {
         // /start
         else if (text === '/start') {
           await sendMessage(BOT_TOKEN, chatId, 
-            `Привет, ${username}! 🧼\n\n/farm — нафармить мыло (1-30, раз в час)\n/balance — баланс\n/top — топ игроков`
+            `🧼 *Эпштейн бот*\n\nОстровное мыловарение 🏝️\n\n/farm — нафармить мыло (1-30, раз в час)\n/balance — баланс\n/top — топ игроков`
           );
         }
       }
@@ -119,6 +142,6 @@ async function sendMessage(token, chatId, text) {
   await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text })
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' })
   });
 }
