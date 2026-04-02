@@ -1,4 +1,4 @@
-// api/webhook.js — полная исправленная версия
+// api/webhook.js — полная версия с детским мылом, Пидиди и дуэлями
 const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
 const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
 
@@ -76,11 +76,11 @@ module.exports = async (req, res) => {
         else if (data.startsWith('duel_action_')) {
           const parts = data.split('_');
           const action = parts[2];
-          const duelId = parts[3];
+          const duelId = parts.slice(3).join('_');
           const duel = duels[duelId];
           
           if (!duel || duel.status !== 'active') {
-            await answerCallback(callback.id, '❌ Дуэль уже завершена или отменена!');
+            await answerCallback(callback.id, '❌ Дуэль уже завершена!');
             await deleteMessage(BOT_TOKEN, chatId, messageId);
             return res.status(200).json({ ok: true });
           }
@@ -265,7 +265,7 @@ module.exports = async (req, res) => {
           }
         }
         
-        const duelId = `duel_${Date.now()}_${userId}`;
+        const duelId = `duel_${Date.now()}`;
         
         duels[duelId] = {
           id: duelId,
