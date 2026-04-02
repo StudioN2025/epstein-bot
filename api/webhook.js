@@ -1,10 +1,17 @@
-// api/webhook.js — исправленная версия для группы
+// api/webhook.js — исправленная версия с поддержкой @username
 const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
 const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
 
 // ID твоей группы
 const ALLOWED_CHAT_ID = -1003608269453;
 const GROUP_INVITE_LINK = 'https://t.me/epstainisland';
+
+// Функция для очистки команды от @имя_бота
+function cleanCommand(text) {
+  if (!text) return '';
+  // Убираем @имя_бота из команды (например /farm@epstain_bot -> /farm)
+  return text.toLowerCase().replace(/@\w+/, '').trim();
+}
 
 module.exports = async (req, res) => {
   const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -17,7 +24,6 @@ module.exports = async (req, res) => {
     try {
       const update = req.body;
       
-      // Проверяем наличие сообщения
       if (!update.message || !update.message.text) {
         return res.status(200).json({ ok: true });
       }
@@ -25,11 +31,15 @@ module.exports = async (req, res) => {
       const chatId = update.message.chat.id;
       const userId = update.message.from.id;
       const username = update.message.from.username || update.message.from.first_name;
-      const text = update.message.text;
+      const rawText = update.message.text;
       const chatType = update.message.chat.type;
       
+      // Очищаем команду от @имя_бота
+      const cleanText = cleanCommand(rawText);
+      
+      console.log(`Получено: "${rawText}" -> очищено: "${cleanText}" от ${username}`);
+      
       // ========== ПРОВЕРКА ГРУППЫ ==========
-      // Если это НЕ разрешенная группа
       if (chatId !== ALLOWED_CHAT_ID) {
         let reply = '';
         
@@ -44,19 +54,13 @@ module.exports = async (req, res) => {
       }
       // =====================================
       
-      // Логируем все команды для отладки
-      console.log(`Получена команда: "${text}" от ${username} в чате ${chatId}`);
-      
       // Загружаем данные
       let data = await loadData();
       if (!data.users) data.users = {};
       
       const user = data.users[userId] || { balance: 0, lastFarm: 0, username: username };
       
-      // Обработка команд (убираем пробелы и переводим в нижний регистр)
-      const cleanText = text.trim().toLowerCase();
-      
-      // /farm
+      // Обработка команд (уже очищенных)
       if (cleanText === '/farm') {
         const now = Math.floor(Date.now() / 1000);
         
@@ -77,12 +81,10 @@ module.exports = async (req, res) => {
         }
       }
       
-      // /balance
       else if (cleanText === '/balance') {
         await sendMessage(BOT_TOKEN, chatId, `📊 ${username}, у тебя ${user.balance} 🧼`);
       }
       
-      // /top
       else if (cleanText === '/top') {
         const users = Object.values(data.users);
         const sorted = users.sort((a, b) => b.balance - a.balance).slice(0, 10);
@@ -98,7 +100,6 @@ module.exports = async (req, res) => {
         }
       }
       
-      // /start
       else if (cleanText === '/start') {
         await sendMessage(BOT_TOKEN, chatId, 
           `🧼 *Остров Эпштейна* 🏝️\n\nПривет, ${username}!\n\n/farm — нафармить мыло (1-30, раз в час)\n/balance — баланс\n/top — топ мыловаров острова`
