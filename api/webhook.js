@@ -1,7 +1,8 @@
-// api/webhook.js — версия с Google Sheets
+// api/webhook.js — исправленная версия
+const GOOGLE_SHEET_ID = '1AtFXRO85k3E7TyJ3GW7kogiejMUhFpeLXHgMcoARNSw';
+
 module.exports = async (req, res) => {
   const BOT_TOKEN = process.env.BOT_TOKEN;
-  const SHEET_ID = process.env.SHEET_ID; // ID твоей таблицы
   
   if (req.method === 'GET') {
     return res.status(200).json({ ok: true, message: 'Epstain Bot 🧼' });
@@ -17,50 +18,44 @@ module.exports = async (req, res) => {
         const username = update.message.from.username || update.message.from.first_name;
         const text = update.message.text;
         
-        // Загружаем данные из Google Sheets
-        let userData = await loadUserData(SHEET_ID, userId);
-        
-        if (!userData) {
-          userData = { balance: 0, username: username, lastFarm: 0 };
-        }
+        // Читаем данные из таблицы
+        let userBalance = await getBalance(userId);
+        let lastFarm = await getLastFarm(userId);
         
         // /farm
         if (text === '/farm') {
-          const now = Math.floor(Date.now() / 1000); // в секундах
+          const now = Math.floor(Date.now() / 1000);
           
-          if (userData.lastFarm && (now - userData.lastFarm) < 3600) {
-            const remaining = Math.ceil(3600 - (now - userData.lastFarm));
-            await sendMessage(BOT_TOKEN, chatId, `⏰ Подожди еще ${remaining} секунд!`);
+          if (lastFarm && (now - lastFarm) < 3600) {
+            const remaining = 3600 - (now - lastFarm);
+            const minutes = Math.floor(remaining / 60);
+            await sendMessage(BOT_TOKEN, chatId, `⏰ Подожди еще ${minutes} минут!`);
           } else {
             const soap = Math.floor(Math.random() * 30) + 1;
-            userData.balance += soap;
-            userData.lastFarm = now;
-            userData.username = username;
+            const newBalance = (userBalance || 0) + soap;
             
-            // Сохраняем в Google Sheets
-            await saveUserData(SHEET_ID, userId, userData);
+            // Сохраняем в таблицу
+            await saveToSheet(userId, username, newBalance, now);
             
-            await sendMessage(BOT_TOKEN, chatId, `🧼 +${soap} мыла!\n📊 Баланс: ${userData.balance} 🧼`);
+            await sendMessage(BOT_TOKEN, chatId, `🧼 +${soap} мыла!\n📊 Новый баланс: ${newBalance} 🧼`);
           }
         }
         
         // /balance
         else if (text === '/balance') {
-          await sendMessage(BOT_TOKEN, chatId, `📊 ${username}, у тебя ${userData.balance} 🧼`);
+          const balance = await getBalance(userId) || 0;
+          await sendMessage(BOT_TOKEN, chatId, `📊 ${username}, у тебя ${balance} 🧼`);
         }
         
         // /top
         else if (text === '/top') {
-          const allUsers = await getAllUsers(SHEET_ID);
-          const sorted = Object.values(allUsers)
-            .sort((a, b) => b.balance - a.balance)
-            .slice(0, 10);
+          const topUsers = await getTopUsers();
           
-          if (sorted.length === 0) {
-            await sendMessage(BOT_TOKEN, chatId, 'Топ пуст! Фарми мыло 🧼');
+          if (topUsers.length === 0) {
+            await sendMessage(BOT_TOKEN, chatId, 'Топ пуст! Нафарми первый 🧼');
           } else {
-            let reply = '🏆 ТОП мыловаров 🧼\n\n';
-            sorted.forEach((user, i) => {
+            let reply = '🏆 ТОП МЫЛОВАРОВ 🧼\n\n';
+            topUsers.forEach((user, i) => {
               reply += `${i+1}. ${user.username} — ${user.balance} 🧼\n`;
             });
             await sendMessage(BOT_TOKEN, chatId, reply);
@@ -70,7 +65,10 @@ module.exports = async (req, res) => {
         // /start
         else if (text === '/start') {
           await sendMessage(BOT_TOKEN, chatId, 
-            `Привет, ${username}! 🧼\n\n/farm — нафармить мыло (1-30, раз в час)\n/balance — баланс\n/top — топ игроков`
+            `Привет, ${username}! 🧼\n\n` +
+            `/farm — нафармить мыло (1-30, раз в час)\n` +
+            `/balance — проверить баланс\n` +
+            `/top — топ игроков`
           );
         }
       }
@@ -85,66 +83,95 @@ module.exports = async (req, res) => {
   return res.status(405).json({ error: 'Method not allowed' });
 };
 
-// Функции работы с Google Sheets
-async function loadUserData(sheetId, userId) {
+// ========== ФУНКЦИИ GOOGLE SHEETS (через sheety.co) ==========
+
+async function getBalance(userId) {
   try {
-    const url = `https://opensheet.elk.sh/${sheetId}/Лист1?user_id=${userId}`;
-    const response = await fetch(url);
+    const response = await fetch(`https://api.sheety.co/${GOOGLE_SHEET_ID}/sheet1`);
     const data = await response.json();
+    const sheet1 = data.sheet1 || [];
     
-    if (data && data.length > 0) {
-      const row = data[0];
-      return {
-        balance: parseInt(row.balance) || 0,
-        username: row.username,
-        lastFarm: parseInt(row.last_farm) || 0
-      };
-    }
-    return null;
+    const user = sheet1.find(row => row.userId == userId);
+    return user ? parseInt(user.balance) : 0;
   } catch (error) {
-    console.log('User not found:', userId);
-    return null;
+    console.error('Get balance error:', error);
+    return 0;
   }
 }
 
-async function saveUserData(sheetId, userId, data) {
-  // Сначала удаляем старую запись
-  await fetch(`https://opensheet.elk.sh/${sheetId}/Лист1/user_id/${userId}/delete`, {
-    method: 'DELETE'
-  });
-  
-  // Добавляем новую
-  await fetch(`https://opensheet.elk.sh/${sheetId}/Лист1`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify([{
-      user_id: userId,
-      username: data.username,
-      balance: data.balance,
-      last_farm: data.lastFarm
-    }])
-  });
+async function getLastFarm(userId) {
+  try {
+    const response = await fetch(`https://api.sheety.co/${GOOGLE_SHEET_ID}/sheet1`);
+    const data = await response.json();
+    const sheet1 = data.sheet1 || [];
+    
+    const user = sheet1.find(row => row.userId == userId);
+    return user ? parseInt(user.lastFarm) : 0;
+  } catch (error) {
+    console.error('Get lastFarm error:', error);
+    return 0;
+  }
 }
 
-async function getAllUsers(sheetId) {
+async function saveToSheet(userId, username, balance, lastFarm) {
   try {
-    const url = `https://opensheet.elk.sh/${sheetId}/Лист1`;
-    const response = await fetch(url);
-    const rows = await response.json();
+    // Сначала получаем все данные
+    const response = await fetch(`https://api.sheety.co/${GOOGLE_SHEET_ID}/sheet1`);
+    const data = await response.json();
+    const sheet1 = data.sheet1 || [];
     
-    const users = {};
-    rows.forEach(row => {
-      if (row.user_id) {
-        users[row.user_id] = {
-          balance: parseInt(row.balance) || 0,
-          username: row.username,
-          lastFarm: parseInt(row.last_farm) || 0
-        };
-      }
-    });
-    return users;
+    const existingUser = sheet1.find(row => row.userId == userId);
+    
+    if (existingUser) {
+      // Обновляем существующего пользователя
+      await fetch(`https://api.sheety.co/${GOOGLE_SHEET_ID}/sheet1/${existingUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheet1: {
+            userId: userId,
+            username: username,
+            balance: balance,
+            lastFarm: lastFarm
+          }
+        })
+      });
+    } else {
+      // Добавляем нового пользователя
+      await fetch(`https://api.sheety.co/${GOOGLE_SHEET_ID}/sheet1`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheet1: {
+            userId: userId,
+            username: username,
+            balance: balance,
+            lastFarm: lastFarm
+          }
+        })
+      });
+    }
   } catch (error) {
-    return {};
+    console.error('Save error:', error);
+  }
+}
+
+async function getTopUsers() {
+  try {
+    const response = await fetch(`https://api.sheety.co/${GOOGLE_SHEET_ID}/sheet1`);
+    const data = await response.json();
+    const sheet1 = data.sheet1 || [];
+    
+    return sheet1
+      .map(row => ({
+        username: row.username,
+        balance: parseInt(row.balance) || 0
+      }))
+      .sort((a, b) => b.balance - a.balance)
+      .slice(0, 10);
+  } catch (error) {
+    console.error('Get top error:', error);
+    return [];
   }
 }
 
