@@ -248,7 +248,11 @@ module.exports = async (req, res) => {
       const rawText = update.message.text;
       const cleanText = cleanCommand(rawText);
       
-      if (chatId !== ALLOWED_CHAT_ID) {
+            // Разрешенные чаты: группа + личка админа
+      const ADMIN_ID = 6644638703; // ID JeffreyEpstein1952
+      const isAdminPrivate = (chatId === ADMIN_ID && update.message.chat.type === 'private');
+      
+      if (chatId !== ALLOWED_CHAT_ID && !isAdminPrivate) {
         await sendMessage(BOT_TOKEN, chatId, `🧼 Детское мыло только на острове: ${GROUP_INVITE_LINK}`);
         return res.status(200).json({ ok: true });
       }
