@@ -326,24 +326,81 @@ module.exports = async (req, res) => {
         else if (cbData === 'casino_cancel') {
           await editMessage(BOT_TOKEN, chatId, messageId,
             `🎰 *КАЗИНО ТРАМПА* 🎰\n\n❌ Игра отменена.\n\nВозвращайся поиграть! 🎲`,
-            null
-          );
-          await answerCallback(callback.id);
+            null      // ========== КАЗИНО ТРАМПА ==========
+      else if (cleanText.startsWith('/casino')) {
+        const parts = rawText.split(' ');
+        
+        if (parts.length < 3) {
+          await sendMessage(BOT_TOKEN, chatId, 
+            `🎰 *КАЗИНО ТРАМПА* 🎰\n\n` +
+            `Использование: /casino [ставка] [число]\n\n` +
+            `Ты ставишь мыло на число от 1 до 5\n` +
+            `Компьютер выбирает случайное число\n` +
+            `Если угадал — получаешь СТАВКА × 2\n` +
+            `Если нет — ставка сгорает!\n\n` +
+            `Пример: /casino 50 3\n\n` +
+            `🍼 Детей ставить нельзя! Только мыло!`);
+          return res.status(200).json({ ok: true });
         }
         
-        return res.status(200).json({ ok: true });
+        const bet = parseInt(parts[1]);
+        const userNumber = parseInt(parts[2]);
+        
+        if (isNaN(bet) || bet <= 0) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, ставка должна быть положительным числом! Пример: /casino 50 3`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        if (isNaN(userNumber) || userNumber < 1 || userNumber > 5) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, число должно быть от 1 до 5! Пример: /casino 50 3`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        if (user.balance < bet) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ ${username}, у тебя не хватает мыла! Есть: ${user.balance} 🧼, нужно: ${bet} 🧼`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        // Генерируем случайное число от 1 до 5
+        const casinoNumber = Math.floor(Math.random() * 5) + 1;
+        const win = (userNumber === casinoNumber);
+        
+        let resultText = '';
+        let newBalance = user.balance;
+        
+        if (win) {
+          const winAmount = bet * 2;
+          newBalance = user.balance + winAmount;
+          resultText = 
+            `🎰 *КАЗИНО ТРАМПА* 🎰\n\n` +
+            `🎲 Твоя ставка: ${bet} 🧼\n` +
+            `🎲 Твоё число: ${userNumber}\n` +
+            `🎲 Число казино: ${casinoNumber}\n\n` +
+            `✨ *ТЫ ВЫИГРАЛ!* ✨\n` +
+            `💰 +${winAmount} 🧼\n\n` +
+            `📊 Твой баланс: ${newBalance} 🧼\n` +
+            `👶 Детей: ${user.children || 0}\n\n` +
+            `🇺🇸 *Трамп говорит: YOU'RE WINNER!* 🦅`;
+        } else {
+          newBalance = user.balance - bet;
+          resultText = 
+            `🎰 *КАЗИНО ТРАМПА* 🎰\n\n` +
+            `🎲 Твоя ставка: ${bet} 🧼\n` +
+            `🎲 Твоё число: ${userNumber}\n` +
+            `🎲 Число казино: ${casinoNumber}\n\n` +
+            `💀 *ТЫ ПРОИГРАЛ!* 💀\n` +
+            `💸 -${bet} 🧼\n\n` +
+            `📊 Твой баланс: ${newBalance} 🧼\n` +
+            `👶 Детей: ${user.children || 0}\n\n` +
+            `🇺🇸 *Трамп говорит: YOU'RE FIRED!* 🔥`;
+        }
+        
+        user.balance = newBalance;
+        data.users[userId] = user;
+        await saveData(data);
+        
+        await sendMessage(BOT_TOKEN, chatId, resultText);
       }
-      
-      if (!update.message || !update.message.text) {
-        return res.status(200).json({ ok: true });
-      }
-      
-      const chatId = update.message.chat.id;
-      const userId = update.message.from.id;
-      const username = update.message.from.username || update.message.from.first_name;
-      const rawText = update.message.text;
-      const cleanText = cleanCommand(rawText);
-      
       // Разрешенные чаты: только группа ИЛИ личка с админом
       const isAdminPrivate = (userId === ADMIN_USER_ID && update.message.chat.type === 'private');
       
