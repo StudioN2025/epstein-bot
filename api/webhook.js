@@ -9,7 +9,7 @@ const PIDIDI_STEAL_MIN = 1;
 const PIDIDI_STEAL_MAX = 10;
 
 const CHILD_COST = 100;
-const CHILD_INCOME = 3;
+const CHILD_INCOME = 1;
 
 let duels = {};
 let PROMOCODES = {
