@@ -616,16 +616,16 @@ module.exports = async (req, res) => {
         }
       }
       
-      else if (cleanText === '/mycredit') {
+            else if (cleanText === '/mycredit') {
         if (!user.creditAmount || user.creditAmount <= 0) {
           await sendMessage(BOT_TOKEN, chatId, `📋 У вас нет активного кредита. Взять: /credit [сумма]`);
           return res.status(200).json({ ok: true });
         }
         
         const timePassed = Date.now() - user.creditStartTime;
-        const hoursPassed = timePassed / 3600000;
+        const hoursPassed = timePassed / 3600000; // ЧАСЫ
         const daysPassed = timePassed / MS_IN_DAY;
-        const totalDebt = Math.floor(user.creditAmount * (1 + CREDIT_INTEREST_RATE * hoursPassed / 100));
+        const totalDebt = Math.floor(user.creditAmount * (1 + (CREDIT_INTEREST_RATE / 100) * hoursPassed));
         const remainingDebt = totalDebt - (user.creditPaid || 0);
         const timeLeft = MAX_CREDIT_DAYS - daysPassed;
         
