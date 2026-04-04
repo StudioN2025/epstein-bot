@@ -502,7 +502,7 @@ module.exports = async (req, res) => {
       }
       
       // ========== КРЕДИТ FPI BANK ==========
-      else if (cleanText.startsWith('/credit')) {
+            else if (cleanText.startsWith('/credit')) {
         const parts = rawText.split(' ');
         if (parts.length < 2) {
           await sendMessage(BOT_TOKEN, chatId, 
@@ -536,6 +536,9 @@ module.exports = async (req, res) => {
         data.users[userId] = user;
         await saveData(data);
         
+        // Расчет процентов за 3 дня для информации
+        const totalFor3Days = Math.floor(amount * (1 + (CREDIT_INTEREST_RATE / 100) * 24 * MAX_CREDIT_DAYS));
+        
         await sendMessage(BOT_TOKEN, chatId,
           `🏦 *FPI BANK - КРЕДИТ ОДОБРЕН* 🏦\n\n` +
           `✅ Кредит ${amount} 🧼 выдан!\n` +
@@ -543,7 +546,7 @@ module.exports = async (req, res) => {
           `⚠️ *Условия возврата:*\n` +
           `• Процент: ${CREDIT_INTEREST_RATE}% в час\n` +
           `• Срок: ${MAX_CREDIT_DAYS} дня\n` +
-          `• Вернуть нужно: ${Math.floor(amount * (1 + CREDIT_INTEREST_RATE * 24 * MAX_CREDIT_DAYS / 100))} 🧼\n\n` +
+          `• Если вернете через ${MAX_CREDIT_DAYS} дня: ${totalFor3Days} 🧼\n\n` +
           `💰 /returncredit [сумма] - вернуть кредит\n` +
           `📋 /mycredit - информация о кредите`);
       }
