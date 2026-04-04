@@ -442,6 +442,7 @@ module.exports = async (req, res) => {
       }
       
       // ========== ОБЫЧНЫЕ КОМАНДЫ ==========
+            // ========== ОБЫЧНЫЕ КОМАНДЫ ==========
       else if (cleanText === '/buychild') {
         if (user.balance >= CHILD_COST) {
           user.balance -= CHILD_COST;
@@ -453,16 +454,17 @@ module.exports = async (req, res) => {
           await sendMessage(BOT_TOKEN, chatId, `❌ Не хватает мыла! Нужно ${CHILD_COST}, есть ${user.balance}`);
         }
       }
+      
       else if (cleanText === '/children') {
         const hourlyIncome = (user.children || 0) * CHILD_INCOME;
-        await sendMessage(BOT_TOKEN, chatId, `👶 ДЕТИ ${username}\n\n🧼 Мыла: ${user.balance}\n👶 Детей: ${user.children}\n📈 Пассивный доход: ${hourlyIncome} 🧼/час\n\n/buychild - 100 мыла = 1 ребенок`);
+        await sendMessage(BOT_TOKEN, chatId, `👶 *ДЕТИ ${username}* 👶\n\n🧼 Мыла: ${user.balance}\n👶 Детей: ${user.children}\n📈 Пассивный доход: ${hourlyIncome} 🧼/час\n\n/buychild - 100 мыла = 1 ребенок`);
       }
-            // ========== ТОП ПО МЫЛУ ==========
+      
       else if (cleanText === '/top') {
         const users = Object.values(data.users);
         const sorted = users.sort((a, b) => b.balance - a.balance).slice(0, 10);
         
-        if (sorted.length === 0) {
+        if (sorted.length === 0 || sorted[0].balance === 0) {
           await sendMessage(BOT_TOKEN, chatId, '🏆 Топ пуст! Нафарми мыло первым 🧼');
         } else {
           let reply = '🏆 *ТОП МЫЛА НА ОСТРОВЕ* 🏆\n\n';
@@ -474,10 +476,10 @@ module.exports = async (req, res) => {
         }
       }
       
-      // ========== ТОП ПО ДЕТЯМ ==========
       else if (cleanText === '/topchildren') {
         const users = Object.values(data.users);
         const sorted = users.sort((a, b) => (b.children || 0) - (a.children || 0)).slice(0, 10);
+        
         if (sorted.length === 0 || sorted[0].children === 0) {
           await sendMessage(BOT_TOKEN, chatId, '👶 Топ детей пуст! Купи ребенка через /buychild');
         } else {
@@ -489,8 +491,7 @@ module.exports = async (req, res) => {
           });
           await sendMessage(BOT_TOKEN, chatId, reply);
         }
-      }
-      }
+                                    }
       else if (cleanText === '/promo') {
         await sendMessage(BOT_TOKEN, chatId, `🎫 ВВЕДИ ПРОМОКОД\n\nОтправь: /promo КОД\n\nПример: /promo SUPEREPSTAIN67`);
       }
