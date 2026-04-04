@@ -457,20 +457,39 @@ module.exports = async (req, res) => {
         const hourlyIncome = (user.children || 0) * CHILD_INCOME;
         await sendMessage(BOT_TOKEN, chatId, `👶 ДЕТИ ${username}\n\n🧼 Мыла: ${user.balance}\n👶 Детей: ${user.children}\n📈 Пассивный доход: ${hourlyIncome} 🧼/час\n\n/buychild - 100 мыла = 1 ребенок`);
       }
+            // ========== ТОП ПО МЫЛУ ==========
+      else if (cleanText === '/top') {
+        const users = Object.values(data.users);
+        const sorted = users.sort((a, b) => b.balance - a.balance).slice(0, 10);
+        
+        if (sorted.length === 0) {
+          await sendMessage(BOT_TOKEN, chatId, '🏆 Топ пуст! Нафарми мыло первым 🧼');
+        } else {
+          let reply = '🏆 *ТОП МЫЛА НА ОСТРОВЕ* 🏆\n\n';
+          sorted.forEach((u, i) => {
+            const childIncome = (u.children || 0) * CHILD_INCOME;
+            reply += `${i+1}. ${u.username} — ${u.balance} 🧼 (👶 ${u.children || 0}, +${childIncome}/ч)\n`;
+          });
+          await sendMessage(BOT_TOKEN, chatId, reply);
+        }
+      }
+      
+      // ========== ТОП ПО ДЕТЯМ ==========
       else if (cleanText === '/topchildren') {
         const users = Object.values(data.users);
         const sorted = users.sort((a, b) => (b.children || 0) - (a.children || 0)).slice(0, 10);
         if (sorted.length === 0 || sorted[0].children === 0) {
-          await sendMessage(BOT_TOKEN, chatId, '👶 Топ детей пуст!');
+          await sendMessage(BOT_TOKEN, chatId, '👶 Топ детей пуст! Купи ребенка через /buychild');
         } else {
-          let reply = '👶 ТОП ДЕТОВОДОВ 👶\n\n';
+          let reply = '👶 *ТОП ДЕТОВОДОВ* 👶\n\n';
           sorted.forEach((u, i) => {
             if (u.children > 0) {
-              reply += `${i+1}. ${u.username} — ${u.children} 👶 (${u.children * CHILD_INCOME} 🧼/час)\n`;
+              reply += `${i+1}. ${u.username} — ${u.children} 👶 (${u.children * CHILD_INCOME} 🧼/ч)\n`;
             }
           });
           await sendMessage(BOT_TOKEN, chatId, reply);
         }
+      }
       }
       else if (cleanText === '/promo') {
         await sendMessage(BOT_TOKEN, chatId, `🎫 ВВЕДИ ПРОМОКОД\n\nОтправь: /promo КОД\n\nПример: /promo SUPEREPSTAIN67`);
