@@ -548,7 +548,7 @@ module.exports = async (req, res) => {
           `📋 /mycredit - информация о кредите`);
       }
       
-      else if (cleanText.startsWith('/returncredit')) {
+           else if (cleanText.startsWith('/returncredit')) {
         const parts = rawText.split(' ');
         if (parts.length < 2) {
           await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /returncredit 50\nВернуть весь кредит: /returncredit all`);
@@ -561,8 +561,8 @@ module.exports = async (req, res) => {
         }
         
         const timePassed = Date.now() - user.creditStartTime;
-        const hoursPassed = timePassed / 3600000;
-        const totalDebt = Math.floor(user.creditAmount * (1 + CREDIT_INTEREST_RATE * hoursPassed / 100));
+        const hoursPassed = timePassed / 3600000; // ЧАСЫ, а не миллисекунды
+        const totalDebt = Math.floor(user.creditAmount * (1 + (CREDIT_INTEREST_RATE / 100) * hoursPassed));
         const remainingDebt = totalDebt - (user.creditPaid || 0);
         
         let returnAmount = 0;
