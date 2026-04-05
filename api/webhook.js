@@ -16,7 +16,7 @@ const MAX_CREDIT_DAYS = 3; // 3 дня на возврат
 const CREDIT_INTEREST_RATE = 1; // 1% в час
 const CREDIT_PENALTY_MULTIPLIER = 2; // штраф х2
 const MS_IN_DAY = 86400000; // миллисекунд в дне
-const MAX_CREDIT_AMOUNT = 1000000; // Максимальная сумма кредита
+const MAX_CREDIT_AMOUNT = 1000000000; // Максимальная сумма кредита
 
 let duels = {};
 let PROMOCODES = {
