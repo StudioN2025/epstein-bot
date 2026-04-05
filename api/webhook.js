@@ -16,6 +16,7 @@ const MAX_CREDIT_DAYS = 3; // 3 дня на возврат
 const CREDIT_INTEREST_RATE = 1; // 1% в час
 const CREDIT_PENALTY_MULTIPLIER = 2; // штраф х2
 const MS_IN_DAY = 86400000; // миллисекунд в дне
+const MAX_CREDIT_AMOUNT = 1000000; // Максимальная сумма кредита
 
 let duels = {};
 let PROMOCODES = {
@@ -87,10 +88,9 @@ async function processCreditDebt(user, now) {
   // Если просрочка больше 3 дней
   if (daysPassed > MAX_CREDIT_DAYS) {
     const penaltyAmount = user.creditAmount * CREDIT_PENALTY_MULTIPLIER;
-    const remainingDebt = penaltyAmount - user.creditPaid || 0;
+    const remainingDebt = penaltyAmount - (user.creditPaid || 0);
     
     if (remainingDebt > 0) {
-      // Отбираем все что получает пользователь
       if (user.balance >= remainingDebt) {
         user.balance -= remainingDebt;
         user.creditAmount = 0;
@@ -98,7 +98,6 @@ async function processCreditDebt(user, now) {
         user.creditPaid = 0;
         return remainingDebt;
       } else {
-        // Забираем всё мыло, долг остается
         const taken = user.balance;
         user.balance = 0;
         user.creditPaid = (user.creditPaid || 0) + taken;
@@ -106,7 +105,6 @@ async function processCreditDebt(user, now) {
       }
     }
   }
-  
   return 0;
 }
 
@@ -307,7 +305,6 @@ module.exports = async (req, res) => {
       
       const now = Date.now();
       
-      // Начисляем пассивный доход от детей
       const childIncome = await collectChildIncome(user, now);
       if (childIncome > 0) {
         user.lastChildIncome = now;
@@ -315,7 +312,6 @@ module.exports = async (req, res) => {
         await saveData(data);
       }
       
-      // Обрабатываем кредитные обязательства
       const debtTaken = await processCreditDebt(user, now);
       if (debtTaken > 0) {
         data.users[userId] = user;
@@ -501,8 +497,45 @@ module.exports = async (req, res) => {
         await sendMessage(BOT_TOKEN, chatId, `✅ Промокод ${code.toUpperCase()} удален!`);
       }
       
+      // АДМИН-КОМАНДА ДЛЯ СБРОСА КРЕДИТА
+      else if (isAdmin && cleanText.startsWith('/resetcredit')) {
+        const parts = rawText.split(' ');
+        if (parts.length < 2) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /resetcredit @username`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetUsername = parts[1].replace('@', '');
+        let targetId = null;
+        for (const [id, u] of Object.entries(data.users)) {
+          if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+            targetId = parseInt(id);
+            break;
+          }
+        }
+        
+        if (!targetId) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        let targetUser = data.users[targetId];
+        if (!targetUser) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ Пользователь не найден в базе!`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        targetUser.creditAmount = 0;
+        targetUser.creditStartTime = null;
+        targetUser.creditPaid = 0;
+        data.users[targetId] = targetUser;
+        await saveData(data);
+        
+        await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} сбросил кредит пользователю @${targetUsername}\n📊 Теперь у него нет активного кредита!`);
+      }
+      
       // ========== КРЕДИТ FPI BANK ==========
-            else if (cleanText.startsWith('/credit')) {
+      else if (cleanText.startsWith('/credit')) {
         const parts = rawText.split(' ');
         if (parts.length < 2) {
           await sendMessage(BOT_TOKEN, chatId, 
@@ -513,6 +546,7 @@ module.exports = async (req, res) => {
             `📊 *Условия:*\n` +
             `• Процент: ${CREDIT_INTEREST_RATE}% в час\n` +
             `• Срок: ${MAX_CREDIT_DAYS} дня\n` +
+            `• Макс сумма: ${MAX_CREDIT_AMOUNT} 🧼\n` +
             `• При невозврате: штраф x${CREDIT_PENALTY_MULTIPLIER}\n` +
             `• За неуплату отбирают весь доход до погашения долга`);
           return res.status(200).json({ ok: true });
@@ -521,6 +555,11 @@ module.exports = async (req, res) => {
         const amount = parseInt(parts[1]);
         if (isNaN(amount) || amount <= 0) {
           await sendMessage(BOT_TOKEN, chatId, `❌ Сумма кредита должна быть положительным числом!`);
+          return res.status(200).json({ ok: true });
+        }
+        
+        if (amount > MAX_CREDIT_AMOUNT) {
+          await sendMessage(BOT_TOKEN, chatId, `❌ Максимальная сумма кредита: ${MAX_CREDIT_AMOUNT} 🧼\nВы запросили: ${amount} 🧼`);
           return res.status(200).json({ ok: true });
         }
         
@@ -536,7 +575,6 @@ module.exports = async (req, res) => {
         data.users[userId] = user;
         await saveData(data);
         
-        // Расчет процентов за 3 дня для информации
         const totalFor3Days = Math.floor(amount * (1 + (CREDIT_INTEREST_RATE / 100) * 24 * MAX_CREDIT_DAYS));
         
         await sendMessage(BOT_TOKEN, chatId,
@@ -551,7 +589,7 @@ module.exports = async (req, res) => {
           `📋 /mycredit - информация о кредите`);
       }
       
-           else if (cleanText.startsWith('/returncredit')) {
+      else if (cleanText.startsWith('/returncredit')) {
         const parts = rawText.split(' ');
         if (parts.length < 2) {
           await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /returncredit 50\nВернуть весь кредит: /returncredit all`);
@@ -564,7 +602,7 @@ module.exports = async (req, res) => {
         }
         
         const timePassed = Date.now() - user.creditStartTime;
-        const hoursPassed = timePassed / 3600000; // ЧАСЫ, а не миллисекунды
+        const hoursPassed = timePassed / 3600000;
         const totalDebt = Math.floor(user.creditAmount * (1 + (CREDIT_INTEREST_RATE / 100) * hoursPassed));
         const remainingDebt = totalDebt - (user.creditPaid || 0);
         
@@ -598,6 +636,7 @@ module.exports = async (req, res) => {
           user.creditAmount = 0;
           user.creditStartTime = null;
           user.creditPaid = 0;
+          data.users[userId] = user;
           await saveData(data);
           await sendMessage(BOT_TOKEN, chatId,
             `🏦 *FPI BANK - КРЕДИТ ПОГАШЕН* 🏦\n\n` +
@@ -612,18 +651,18 @@ module.exports = async (req, res) => {
             `✅ Возвращено: ${returnAmount} 🧼\n` +
             `📊 Ваш баланс: ${user.balance} 🧼\n` +
             `💰 Остаток долга: ${newRemainingDebt} 🧼\n\n` +
-            `⚠️ Просрочка через: ${Math.max(0, MAX_CREDIT_DAYS - (timePassed / MS_IN_DAY)).toFixed(1)} дня`);
+            `/returncredit all - погасить полностью`);
         }
       }
       
-            else if (cleanText === '/mycredit') {
+      else if (cleanText === '/mycredit') {
         if (!user.creditAmount || user.creditAmount <= 0) {
           await sendMessage(BOT_TOKEN, chatId, `📋 У вас нет активного кредита. Взять: /credit [сумма]`);
           return res.status(200).json({ ok: true });
         }
         
         const timePassed = Date.now() - user.creditStartTime;
-        const hoursPassed = timePassed / 3600000; // ЧАСЫ
+        const hoursPassed = timePassed / 3600000;
         const daysPassed = timePassed / MS_IN_DAY;
         const totalDebt = Math.floor(user.creditAmount * (1 + (CREDIT_INTEREST_RATE / 100) * hoursPassed));
         const remainingDebt = totalDebt - (user.creditPaid || 0);
@@ -936,7 +975,7 @@ module.exports = async (req, res) => {
         if (user.creditAmount && user.creditAmount > 0) {
           const timePassed = Date.now() - user.creditStartTime;
           const hoursPassed = timePassed / 3600000;
-          const totalDebt = Math.floor(user.creditAmount * (1 + CREDIT_INTEREST_RATE * hoursPassed / 100));
+          const totalDebt = Math.floor(user.creditAmount * (1 + (CREDIT_INTEREST_RATE / 100) * hoursPassed));
           const remainingDebt = totalDebt - (user.creditPaid || 0);
           creditInfo = `\n\n🏦 *Активный кредит:* ${remainingDebt} 🧼\n/returncredit - погасить`;
         }
@@ -955,7 +994,8 @@ module.exports = async (req, res) => {
             `/removechild @user 2\n` +
             `/createpromo КОД 100 10\n` +
             `/deletepromo КОД\n` +
-            `/promolist\n`;
+            `/promolist\n` +
+            `/resetcredit @user\n`;
         }
         await sendMessage(BOT_TOKEN, chatId,
           `🧼 *ОСТРОВ ЭПШТЕЙНА* 🏝️\n\nПривет, ${username}!\n\n` +
@@ -971,7 +1011,7 @@ module.exports = async (req, res) => {
           `/duel @user [ставка] — дуэль\n` +
           `/casino [ставка] [число] — казино (x2 при победе)\n` +
           `/promo — ввести промокод\n` +
-          `/credit [сумма] — взять кредит в FPI Bank\n` +
+          `/credit [сумма] — взять кредит (макс ${MAX_CREDIT_AMOUNT} 🧼)\n` +
           `/returncredit [сумма/all] — вернуть кредит\n` +
           `/mycredit — информация о кредите` +
           adminCommands +
