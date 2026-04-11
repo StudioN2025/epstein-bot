@@ -1,7 +1,7 @@
 const { sendMessage, saveData } = require('./helpers');
 const config = require('./config');
 
-async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username) {
+async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   const nowTime = Date.now();
   
   if (cleanText === '/buynuke') {
