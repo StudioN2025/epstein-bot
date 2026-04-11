@@ -22,13 +22,13 @@ async function handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
       `• Обычные дети сидят в подвалах и приносят доход (${config.CHILD_INCOME} 🧼/час)\n` +
       `• Мобилизуй детей за ${config.MOBILIZATION_COST} 🧼 — они пойдут в армию\n` +
       `• Мобилизованные дети могут АТАКОВАТЬ и ЗАЩИЩАТЬ\n` +
-      `• 10 мобилизованных детей = захват 1 подвала\n` +
+      `• 1 мобилизованный ребенок = захват 1 подвала\n` +
       `• Захваченный подвал приносит ${config.BASEMENT_CAPTURE_REWARD} 🧼/час\n` +
-      `• Освободить свой подвал: /free @user [количество] (${config.FREE_COST} 🧼/шт)\n` +
+      `• Освободить подвал: /free @user (бесплатно, только если ты захватил)\n` +
       `• При атаке можно перехватить захваченные подвалы\n\n` +
       `/mobilize [количество] — мобилизовать детей\n` +
       `/attack @user [количество] — атаковать\n` +
-      `/free @user [количество] — освободить свои подвалы\n` +
+      `/free @user [количество] — освободить свои захваченные подвалы\n` +
       `/myarmy — моя армия\n` +
       `/mycaptured — мои захваченные подвалы`);
     return true;
@@ -136,16 +136,16 @@ async function handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
       `${username} атакует @${targetName} с ${attackers} мобилизованными детьми!\n` +
       `🛡️ У @${targetName} мобилизовано защитников: ${defenders}\n`;
     
-    // Отбиваем свои подвалы
+    // Отбиваем свои подвалы (1 атакующий = 1 подвал)
     if (targetUser.capturedBasementsDetails && targetUser.capturedBasementsDetails.length > 0) {
       const myCapturedFromTarget = targetUser.capturedBasementsDetails.find(c => c.ownerId === userId);
       if (myCapturedFromTarget && myCapturedFromTarget.count > 0) {
-        const canRecapture = Math.min(myCapturedFromTarget.count, Math.floor(attackers / config.CHILDREN_PER_BASEMENT));
+        const canRecapture = Math.min(myCapturedFromTarget.count, attackers);
         if (canRecapture > 0) {
           recapturedBasements = canRecapture;
           const removed = removeCapturedBasement(targetUser, userId, canRecapture);
           if (removed > 0) {
-            attackers -= removed * config.CHILDREN_PER_BASEMENT;
+            attackers -= removed;
             user.basements = (user.basements || 0) + removed;
             message += `🔄 *ВОЗВРАЩЕНЫ СВОИ ПОДВАЛЫ!* 🔄\n` +
               `🏚️ Возвращено подвалов: ${removed}\n\n`;
@@ -154,7 +154,7 @@ async function handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
       }
     }
     
-    // Битва
+    // Битва с защитниками
     if (attackers > defenders) {
       const survivors = attackers - defenders;
       killedAttackers = defenders;
@@ -169,20 +169,21 @@ async function handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
         const totalBasements = targetOwnBasements + targetCapturedBasements;
         
         if (totalBasements > 0) {
-          const canCapture = Math.min(Math.floor(survivors / config.CHILDREN_PER_BASEMENT), totalBasements);
+          // 1 атакующий = 1 подвал
+          const canCapture = Math.min(survivors, totalBasements);
           
           if (canCapture > 0) {
             capturedBasements = canCapture;
             let remainingToCapture = canCapture;
             
-            // Захватываем собственные подвалы
+            // Захватываем собственные подвалы цели
             const ownToCapture = Math.min(remainingToCapture, targetOwnBasements);
             if (ownToCapture > 0) {
               targetUser.basements = targetOwnBasements - ownToCapture;
               remainingToCapture -= ownToCapture;
             }
             
-            // Захватываем подвалы, захваченные целью
+            // Захватываем подвалы, которые цель захватила у других
             if (remainingToCapture > 0 && targetUser.capturedBasementsDetails && targetUser.capturedBasementsDetails.length > 0) {
               let toCapture = remainingToCapture;
               for (let i = 0; i < targetUser.capturedBasementsDetails.length && toCapture > 0; i++) {
@@ -202,7 +203,7 @@ async function handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
               addCapturedBasement(user, targetId, targetName);
             }
             
-            const remainingAttackers = survivors % config.CHILDREN_PER_BASEMENT;
+            const remainingAttackers = survivors - capturedBasements;
             message += `💥 *ЗАХВАТ ПОДВАЛОВ!* 💥\n` +
               `🏚️ Захвачено подвалов: ${capturedBasements}\n` +
               `💰 Каждый захваченный подвал приносит ${config.BASEMENT_CAPTURE_REWARD} 🧼/час!\n`;
@@ -211,7 +212,7 @@ async function handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
               message += `\n⚔️ Осталось атакующих: ${remainingAttackers} (возвращаются домой)`;
             }
           } else {
-            message += `❌ Недостаточно атакующих для захвата хотя бы одного подвала (нужно 10 на подвал)!\n` +
+            message += `❌ Недостаточно атакующих для захвата хотя бы одного подвала!\n` +
               `\n⚔️ Осталось атакующих: ${survivors} (возвращаются домой)`;
           }
         } else {
@@ -252,17 +253,18 @@ async function handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
     }
     
     const parts = rawText.split(' ');
-    if (parts.length < 3) {
-      await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /free @username 2\nОсвободить свои подвалы, захваченные этим пользователем`);
+    if (parts.length < 2) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /free @username\nОсвободить подвал, который ты захватил у этого пользователя`);
       return true;
     }
     
     let targetUsername = parts[1].replace('@', '');
-    let amount = parseInt(parts[2]);
-    
-    if (isNaN(amount) || amount <= 0) {
-      await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число! Пример: /free @username 2`);
-      return true;
+    let amount = 1;
+    if (parts.length >= 3) {
+      const parsedAmount = parseInt(parts[2]);
+      if (!isNaN(parsedAmount) && parsedAmount > 0) {
+        amount = parsedAmount;
+      }
     }
     
     let targetId = null;
@@ -280,30 +282,32 @@ async function handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
       return true;
     }
     
+    // Проверяем, есть ли у пользователя захваченные подвалы у этого targetId
+    if (!user.capturedBasementsDetails || user.capturedBasementsDetails.length === 0) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ У тебя нет захваченных подвалов у @${targetName}!`);
+      return true;
+    }
+    
+    const myCapturedOnTarget = user.capturedBasementsDetails.find(c => c.ownerId === targetId);
+    if (!myCapturedOnTarget || myCapturedOnTarget.count === 0) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ У тебя нет захваченных подвалов у @${targetName}!`);
+      return true;
+    }
+    
+    const canFree = Math.min(amount, myCapturedOnTarget.count);
+    
+    // Возвращаем подвалы владельцу (targetUser)
     let targetUser = data.users[targetId];
-    if (!targetUser || !targetUser.capturedBasementsDetails) {
-      await sendMessage(BOT_TOKEN, chatId, `❌ У @${targetName} нет твоих захваченных подвалов!`);
+    if (!targetUser) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Пользователь @${targetName} не найден в базе!`);
       return true;
     }
     
-    const myCaptured = targetUser.capturedBasementsDetails.find(c => c.ownerId === userId);
-    if (!myCaptured || myCaptured.count === 0) {
-      await sendMessage(BOT_TOKEN, chatId, `❌ У @${targetName} нет твоих захваченных подвалов!`);
-      return true;
-    }
+    // Забираем подвалы у атакующего
+    const removed = removeCapturedBasement(user, targetId, canFree);
     
-    const canFree = Math.min(amount, myCaptured.count);
-    const totalCost = config.FREE_COST * canFree;
-    
-    if (user.balance < totalCost) {
-      await sendMessage(BOT_TOKEN, chatId, `❌ Не хватает мыла для освобождения! Нужно: ${totalCost} 🧼, есть: ${user.balance} 🧼`);
-      return true;
-    }
-    
-    user.balance -= totalCost;
-    
-    const removed = removeCapturedBasement(targetUser, userId, canFree);
-    user.basements = (user.basements || 0) + removed;
+    // Возвращаем подвалы владельцу
+    targetUser.basements = (targetUser.basements || 0) + removed;
     
     data.users[userId] = user;
     data.users[targetId] = targetUser;
@@ -311,10 +315,9 @@ async function handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
     
     await sendMessage(BOT_TOKEN, chatId,
       `🏚️ *ОСВОБОЖДЕНИЕ ПОДВАЛОВ* 🏚️\n\n` +
-      `👤 ${username} освободил ${removed} подвал(ов) у @${targetName}\n` +
-      `🧼 -${totalCost} мыла\n` +
-      `🏚️ Теперь у тебя подвалов: ${user.basements}\n` +
-      `📊 Баланс: ${user.balance} 🧼`);
+      `👤 ${username} освободил ${removed} подвал(ов) и вернул их @${targetName}\n` +
+      `🏚️ Теперь у @${targetName} подвалов: ${targetUser.basements}\n` +
+      `🏚️ У тебя осталось захваченных подвалов: ${user.capturedBasements || 0}`);
     return true;
   }
   
@@ -346,7 +349,7 @@ async function handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
     }
     reply += `\n📊 Всего захвачено: ${total} 🏚️\n` +
       `💰 Общий доход: ${total * config.BASEMENT_CAPTURE_REWARD} 🧼/час\n\n` +
-      `/free @user [количество] — освободить свои подвалы`;
+      `/free @user — освободить подвал (бесплатно, только свои захваченные)`;
     
     await sendMessage(BOT_TOKEN, chatId, reply);
     return true;
