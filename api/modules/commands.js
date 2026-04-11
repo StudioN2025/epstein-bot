@@ -1,7 +1,7 @@
 const { sendMessage } = require('./helpers');
 const config = require('./config');
 
-async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username) {
+async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/balance') return false;
   
   const hourlyIncome = (user.children || 0) * config.CHILD_INCOME;
@@ -30,7 +30,7 @@ async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, c
   return true;
 }
 
-async function handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username) {
+async function handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/top') return false;
   
   const users = Object.values(data.users);
@@ -49,7 +49,7 @@ async function handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
   return true;
 }
 
-async function handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username) {
+async function handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/topchildren') return false;
   
   const users = Object.values(data.users);
@@ -69,7 +69,7 @@ async function handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKE
   return true;
 }
 
-async function handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username) {
+async function handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/topbasements') return false;
   
   const users = Object.values(data.users);
@@ -109,7 +109,7 @@ async function handleTopMobilizedCommand(cleanText, rawText, user, data, BOT_TOK
   return true;
 }
 
-async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin) {
+async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin) {
   if (cleanText !== '/start') return false;
   
   let adminCommands = '';
