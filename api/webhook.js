@@ -1,10 +1,9 @@
-const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate } = require('./modules/helpers');
-const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate } = require('./modules/helpers');
+const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, collectChildIncome, collectCapturedBasementsIncome } = require('./modules/helpers');
 const config = require('./modules/config');
 const { handleDuelCallback, handleDuelCommand } = require('./modules/duels');
 const { handleBasementCommand } = require('./modules/basements');
 const { handleChildCommand } = require('./modules/children');
-const { handleSvoCommand, handleAttackCallback } = require('./modules/svo');
+const { handleSvoCommand } = require('./modules/svo');
 const { handleCasinoCommand } = require('./modules/casino');
 const { handlePromoCommand } = require('./modules/promo');
 const { handleAdminCommand } = require('./modules/admin');
@@ -33,11 +32,6 @@ module.exports = async (req, res) => {
         // Дуэли
         if (cbData.startsWith('accept_') || cbData.startsWith('aim_') || cbData.startsWith('break_') || cbData.startsWith('shoot_')) {
           return await handleDuelCallback(update, BOT_TOKEN, duels);
-        }
-        
-        // Атаки СВО (если нужны кнопки)
-        if (cbData.startsWith('svo_')) {
-          return await handleAttackCallback(update, BOT_TOKEN);
         }
       }
       
@@ -76,6 +70,22 @@ module.exports = async (req, res) => {
       if (user.nukes === undefined) user.nukes = 0;
       if (!user.lastChildIncome) user.lastChildIncome = Date.now();
       if (!user.lastCapturedIncome) user.lastCapturedIncome = Date.now();
+      
+      // Начисляем пассивный доход
+      const now = Date.now();
+      const childIncome = await collectChildIncome(user, now);
+      if (childIncome > 0) {
+        user.lastChildIncome = now;
+        data.users[userId] = user;
+        await saveData(data);
+      }
+      
+      const capturedIncome = await collectCapturedBasementsIncome(user, now);
+      if (capturedIncome > 0) {
+        user.lastCapturedIncome = now;
+        data.users[userId] = user;
+        await saveData(data);
+      }
       
       // Проверка мута
       if (user.mutedUntil && user.mutedUntil > Math.floor(Date.now() / 1000)) {
