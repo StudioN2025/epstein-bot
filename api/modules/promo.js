@@ -3,7 +3,7 @@ const config = require('./config');
 
 let PROMOCODES = { ...config.INITIAL_PROMOCODES };
 
-async function handlePromoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username) {
+async function handlePromoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText === '/promo') {
     await sendMessage(BOT_TOKEN, chatId, `🎫 ВВЕДИ ПРОМОКОД\n\nОтправь: /promo КОД\n\nПример: /promo SUPEREPSTAIN67`);
     return true;
