@@ -19,7 +19,6 @@ const CHILDREN_PER_BASEMENT = 10;
 const EVENT_END = new Date('2026-04-18T00:00:00+03:00').getTime();
 const MOBILIZATION_COST = 50;
 const BASEMENT_CAPTURE_REWARD = 10;
-const FREE_COST = 200;
 
 // Ядерная бомба
 const NUKE_PRICE = 15000;
