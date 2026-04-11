@@ -1,7 +1,7 @@
 const { sendMessage } = require('./helpers');
 const config = require('./config');
 
-async function handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username) {
+async function handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText === '/basements') {
     const userBasements = user.basements || 0;
     const userChildren = user.children || 0;
