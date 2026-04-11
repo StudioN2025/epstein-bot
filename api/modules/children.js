@@ -1,7 +1,7 @@
 const { sendMessage, saveData } = require('./helpers');
 const config = require('./config');
 
-async function handleChildCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username) {
+async function handleChildCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText.startsWith('/buychild')) {
     let amount = 1;
     const parts = rawText.split(' ');
