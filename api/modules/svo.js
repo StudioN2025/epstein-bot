@@ -1,7 +1,7 @@
 const { sendMessage, saveData, addCapturedBasement, removeCapturedBasement } = require('./helpers');
 const config = require('./config');
 
-async function handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username) {
+async function handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   const nowTime = Date.now();
   
   if (cleanText === '/svo') {
