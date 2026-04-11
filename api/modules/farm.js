@@ -1,7 +1,7 @@
 const { sendMessage, saveData } = require('./helpers');
 const config = require('./config');
 
-async function handleFarmCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username) {
+async function handleFarmCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/farm') return false;
   
   const nowSec = Math.floor(Date.now() / 1000);
