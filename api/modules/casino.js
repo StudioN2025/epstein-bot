@@ -1,6 +1,6 @@
 const { sendMessage, saveData } = require('./helpers');
 
-async function handleCasinoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username) {
+async function handleCasinoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (!cleanText.startsWith('/casino')) return false;
   
   const parts = rawText.split(' ');
