@@ -21,7 +21,7 @@ const MOBILIZATION_COST = 50;
 const BASEMENT_CAPTURE_REWARD = 10;
 
 // Ядерная бомба
-const NUKE_PRICE = 15000;
+const NUKE_PRICE = 8000;
 const NUKE_ACTIVATE_DATE = new Date('2026-04-23T00:00:00+03:00').getTime();
 
 // Админ
