@@ -101,46 +101,46 @@ module.exports = async (req, res) => {
       if (await handleAdminCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username)) {
+      else if (await handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username)) {
+      else if (await handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleChildCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username)) {
+      else if (await handleChildCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username)) {
+      else if (await handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleCasinoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username)) {
+      else if (await handleCasinoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handlePromoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username)) {
+      else if (await handlePromoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleDuelCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, duels)) {
+      else if (await handleDuelCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, duels)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleFarmCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username)) {
+      else if (await handleFarmCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username)) {
+      else if (await handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username)) {
+      else if (await handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username)) {
+      else if (await handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username)) {
+      else if (await handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleTopMobilizedCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username)) {
+      else if (await handleTopMobilizedCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      else if (await handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
+      else if (await handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) {
         return res.status(200).json({ ok: true });
       }
       
