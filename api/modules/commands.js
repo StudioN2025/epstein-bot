@@ -1,6 +1,12 @@
 const { sendMessage } = require('./helpers');
 const config = require('./config');
 
+// Функция экранирования Markdown-спецсимволов
+function escapeMarkdown(text) {
+  if (!text) return 'Unknown';
+  return String(text).replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
+}
+
 async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/balance') return false;
   
@@ -15,7 +21,7 @@ async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, c
   }
   
   await sendMessage(BOT_TOKEN, chatId,
-    `📊 *${username}*\n\n` +
+    `📊 *${escapeMarkdown(username)}*\n\n` +
     `🧼 Мыла: ${user.balance}\n` +
     `🏚️ Своих подвалов: ${userBasements}\n` +
     `🏚️ Захваченных подвалов: ${user.capturedBasements || 0}\n` +
@@ -34,16 +40,24 @@ async function handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
   if (cleanText !== '/top') return false;
   
   const users = Object.values(data.users);
-  const sorted = users.sort((a, b) => b.balance - a.balance).slice(0, 10);
+  // Сортируем по балансу (от большего к меньшему)
+  const sorted = users.sort((a, b) => (b.balance || 0) - (a.balance || 0)).slice(0, 10);
   
   if (sorted.length === 0 || sorted[0].balance === 0) {
     await sendMessage(BOT_TOKEN, chatId, '🏆 Топ пуст! Нафарми мыло первым 🧼');
   } else {
     let reply = '🏆 *ТОП МЫЛА НА ОСТРОВЕ* 🏆\n\n';
-    sorted.forEach((u, i) => {
+    for (let i = 0; i < sorted.length; i++) {
+      const u = sorted[i];
       const childIncome = (u.children || 0) * config.CHILD_INCOME;
-      reply += `${i+1}. ${u.username} — ${u.balance} 🧼 (👶 ${u.children || 0}, ⚔️ ${u.mobilized || 0}, 🏚️ ${u.basements || 0}, +${childIncome}/ч)\n`;
-    });
+      const balance = u.balance || 0;
+      const children = u.children || 0;
+      const mobilized = u.mobilized || 0;
+      const basements = u.basements || 0;
+      const name = escapeMarkdown(u.username || 'Unknown');
+      
+      reply += `${i+1}. ${name} — ${balance} 🧼 (👶 ${children}, ⚔️ ${mobilized}, 🏚️ ${basements}, +${childIncome}/ч)\n`;
+    }
     await sendMessage(BOT_TOKEN, chatId, reply);
   }
   return true;
@@ -59,11 +73,13 @@ async function handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKE
     await sendMessage(BOT_TOKEN, chatId, '👶 Топ обычных детей пуст! Купи ребенка через /buychild');
   } else {
     let reply = '👶 *ТОП ОБЫЧНЫХ ДЕТЕЙ* 👶\n\n';
-    sorted.forEach((u, i) => {
+    for (let i = 0; i < sorted.length; i++) {
+      const u = sorted[i];
       if (u.children > 0) {
-        reply += `${i+1}. ${u.username} — ${u.children} 👶 (⚔️ ${u.mobilized || 0}, 🏚️ ${u.basements || 0})\n`;
+        const name = escapeMarkdown(u.username || 'Unknown');
+        reply += `${i+1}. ${name} — ${u.children} 👶 (⚔️ ${u.mobilized || 0}, 🏚️ ${u.basements || 0})\n`;
       }
-    });
+    }
     await sendMessage(BOT_TOKEN, chatId, reply);
   }
   return true;
@@ -79,17 +95,19 @@ async function handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOK
     await sendMessage(BOT_TOKEN, chatId, '🏚️ Топ подвалов пуст! Купи подвал через /buybasement');
   } else {
     let reply = '🏚️ *ТОП ПОДВАЛОВ* 🏚️\n\n';
-    sorted.forEach((u, i) => {
+    for (let i = 0; i < sorted.length; i++) {
+      const u = sorted[i];
       if (u.basements > 0) {
-        reply += `${i+1}. ${u.username} — ${u.basements} 🏚️ (👶 ${u.children || 0}, ⚔️ ${u.mobilized || 0})\n`;
+        const name = escapeMarkdown(u.username || 'Unknown');
+        reply += `${i+1}. ${name} — ${u.basements} 🏚️ (👶 ${u.children || 0}, ⚔️ ${u.mobilized || 0})\n`;
       }
-    });
+    }
     await sendMessage(BOT_TOKEN, chatId, reply);
   }
   return true;
 }
 
-async function handleTopMobilizedCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username) {
+async function handleTopMobilizedCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/topmobilized') return false;
   
   const users = Object.values(data.users);
@@ -99,11 +117,13 @@ async function handleTopMobilizedCommand(cleanText, rawText, user, data, BOT_TOK
     await sendMessage(BOT_TOKEN, chatId, '⚔️ Топ мобилизованных пуст! Мобилизуй детей через /mobilize');
   } else {
     let reply = '⚔️ *ТОП МОБИЛИЗОВАННЫХ* ⚔️\n\n';
-    sorted.forEach((u, i) => {
+    for (let i = 0; i < sorted.length; i++) {
+      const u = sorted[i];
       if (u.mobilized > 0) {
-        reply += `${i+1}. ${u.username} — ⚔️ ${u.mobilized} (👶 ${u.children || 0}, 🏚️ ${u.basements || 0})\n`;
+        const name = escapeMarkdown(u.username || 'Unknown');
+        reply += `${i+1}. ${name} — ⚔️ ${u.mobilized} (👶 ${u.children || 0}, 🏚️ ${u.basements || 0})\n`;
       }
-    });
+    }
     await sendMessage(BOT_TOKEN, chatId, reply);
   }
   return true;
@@ -137,7 +157,7 @@ async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, cha
   }
   
   await sendMessage(BOT_TOKEN, chatId,
-    `🧼 *ОСТРОВ ЭПШТЕЙНА* 🏝️\n\nПривет, ${username}!\n\n` +
+    `🧼 *ОСТРОВ ЭПШТЕЙНА* 🏝️\n\nПривет, ${escapeMarkdown(username)}!\n\n` +
     `🎯 *КОМАНДЫ:*\n` +
     `/farm — фарм мыла (1-30, раз в час)\n` +
     `/balance — баланс\n` +
@@ -159,7 +179,7 @@ async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, cha
     `/svo — информация об ивенте\n` +
     `/mobilize [количество] — мобилизовать детей (${config.MOBILIZATION_COST} 🧼/шт)\n` +
     `/attack @user [количество] — атаковать\n` +
-    `/free @user [количество] — освободить свои подвалы (${config.FREE_COST} 🧼/шт)\n` +
+    `/free @user [количество] — освободить свои захваченные подвалы\n` +
     `/myarmy — моя армия\n` +
     `/mycaptured — мои захваченные подвалы` +
     nukeCommands +
