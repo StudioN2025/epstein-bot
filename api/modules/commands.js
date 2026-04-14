@@ -1,4 +1,4 @@
-const { sendMessage } = require('./helpers');
+const { sendMessage, saveData } = require('./helpers');
 const config = require('./config');
 
 // Функция экранирования Markdown-спецсимволов
@@ -40,7 +40,6 @@ async function handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
   if (cleanText !== '/top') return false;
   
   const users = Object.values(data.users);
-  // Сортируем по балансу (от большего к меньшему)
   const sorted = users.sort((a, b) => (b.balance || 0) - (a.balance || 0)).slice(0, 10);
   
   if (sorted.length === 0 || sorted[0].balance === 0) {
@@ -129,6 +128,204 @@ async function handleTopMobilizedCommand(cleanText, rawText, user, data, BOT_TOK
   return true;
 }
 
+// ========== КОМАНДЫ ПЕРЕВОДА ==========
+
+async function handleSendSoap(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+  if (!cleanText.startsWith('/sendsoap')) return false;
+  
+  const parts = rawText.split(' ');
+  if (parts.length < 3) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /sendsoap @username 50`);
+    return true;
+  }
+  
+  let targetUsername = parts[1].replace('@', '');
+  const amount = parseInt(parts[2]);
+  
+  if (isNaN(amount) || amount <= 0) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+    return true;
+  }
+  
+  // Находим получателя
+  let targetId = null;
+  let targetName = targetUsername;
+  for (const [id, u] of Object.entries(data.users)) {
+    if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+      targetId = parseInt(id);
+      targetName = u.username;
+      break;
+    }
+  }
+  
+  if (!targetId) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Не найден игрок @${targetUsername}`);
+    return true;
+  }
+  
+  if (targetId === userId) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Нельзя переводить мыло самому себе!`);
+    return true;
+  }
+  
+  let targetUser = data.users[targetId];
+  if (!targetUser) {
+    targetUser = { balance: 0, children: 0, basements: 0, username: targetName };
+  }
+  
+  if (user.balance < amount) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Не хватает мыла! Есть: ${user.balance}, нужно: ${amount}`);
+    return true;
+  }
+  
+  // Переводим
+  user.balance -= amount;
+  targetUser.balance = (targetUser.balance || 0) + amount;
+  
+  data.users[userId] = user;
+  data.users[targetId] = targetUser;
+  await saveData(data);
+  
+  await sendMessage(BOT_TOKEN, chatId,
+    `💰 *ПЕРЕВОД МЫЛА* 💰\n\n` +
+    `От: ${escapeMarkdown(username)}\n` +
+    `Кому: @${escapeMarkdown(targetName)}\n` +
+    `Сумма: ${amount} 🧼\n\n` +
+    `📊 У ${escapeMarkdown(username)} осталось: ${user.balance} 🧼\n` +
+    `📊 У @${escapeMarkdown(targetName)} теперь: ${targetUser.balance} 🧼`);
+  return true;
+}
+
+async function handleSendChild(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+  if (!cleanText.startsWith('/sendchild')) return false;
+  
+  const parts = rawText.split(' ');
+  if (parts.length < 3) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /sendchild @username 2`);
+    return true;
+  }
+  
+  let targetUsername = parts[1].replace('@', '');
+  const amount = parseInt(parts[2]);
+  
+  if (isNaN(amount) || amount <= 0) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+    return true;
+  }
+  
+  let targetId = null;
+  let targetName = targetUsername;
+  for (const [id, u] of Object.entries(data.users)) {
+    if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+      targetId = parseInt(id);
+      targetName = u.username;
+      break;
+    }
+  }
+  
+  if (!targetId) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Не найден игрок @${targetUsername}`);
+    return true;
+  }
+  
+  if (targetId === userId) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Нельзя переводить детей самому себе!`);
+    return true;
+  }
+  
+  let targetUser = data.users[targetId];
+  if (!targetUser) {
+    targetUser = { balance: 0, children: 0, basements: 0, username: targetName };
+  }
+  
+  const userChildren = user.children || 0;
+  if (userChildren < amount) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Не хватает детей! Есть: ${userChildren}, нужно: ${amount}`);
+    return true;
+  }
+  
+  user.children = userChildren - amount;
+  targetUser.children = (targetUser.children || 0) + amount;
+  
+  data.users[userId] = user;
+  data.users[targetId] = targetUser;
+  await saveData(data);
+  
+  await sendMessage(BOT_TOKEN, chatId,
+    `👶 *ПЕРЕВОД ДЕТЕЙ* 👶\n\n` +
+    `От: ${escapeMarkdown(username)}\n` +
+    `Кому: @${escapeMarkdown(targetName)}\n` +
+    `Количество: ${amount} 👶\n\n` +
+    `📊 У ${escapeMarkdown(username)} осталось: ${user.children} 👶\n` +
+    `📊 У @${escapeMarkdown(targetName)} теперь: ${targetUser.children} 👶`);
+  return true;
+}
+
+async function handleSendBasement(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+  if (!cleanText.startsWith('/sendbasement')) return false;
+  
+  const parts = rawText.split(' ');
+  if (parts.length < 3) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /sendbasement @username 2`);
+    return true;
+  }
+  
+  let targetUsername = parts[1].replace('@', '');
+  const amount = parseInt(parts[2]);
+  
+  if (isNaN(amount) || amount <= 0) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+    return true;
+  }
+  
+  let targetId = null;
+  let targetName = targetUsername;
+  for (const [id, u] of Object.entries(data.users)) {
+    if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+      targetId = parseInt(id);
+      targetName = u.username;
+      break;
+    }
+  }
+  
+  if (!targetId) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Не найден игрок @${targetUsername}`);
+    return true;
+  }
+  
+  if (targetId === userId) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Нельзя переводить подвалы самому себе!`);
+    return true;
+  }
+  
+  let targetUser = data.users[targetId];
+  if (!targetUser) {
+    targetUser = { balance: 0, children: 0, basements: 0, username: targetName };
+  }
+  
+  const userBasements = user.basements || 0;
+  if (userBasements < amount) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Не хватает подвалов! Есть: ${userBasements}, нужно: ${amount}`);
+    return true;
+  }
+  
+  user.basements = userBasements - amount;
+  targetUser.basements = (targetUser.basements || 0) + amount;
+  
+  data.users[userId] = user;
+  data.users[targetId] = targetUser;
+  await saveData(data);
+  
+  await sendMessage(BOT_TOKEN, chatId,
+    `🏚️ *ПЕРЕВОД ПОДВАЛОВ* 🏚️\n\n` +
+    `От: ${escapeMarkdown(username)}\n` +
+    `Кому: @${escapeMarkdown(targetName)}\n` +
+    `Количество: ${amount} 🏚️\n\n` +
+    `📊 У ${escapeMarkdown(username)} осталось: ${user.basements} 🏚️\n` +
+    `📊 У @${escapeMarkdown(targetName)} теперь: ${targetUser.basements} 🏚️`);
+  return true;
+}
+
 async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin) {
   if (cleanText !== '/start') return false;
   
@@ -200,5 +397,8 @@ module.exports = {
   handleTopChildrenCommand,
   handleTopBasementsCommand,
   handleTopMobilizedCommand,
+  handleSendSoap,
+  handleSendChild,
+  handleSendBasement,
   handleStartCommand
 };
