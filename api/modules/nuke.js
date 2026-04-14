@@ -1,6 +1,9 @@
 const { sendMessage, saveData, editMessage } = require('./helpers');
 const config = require('./config');
 
+// Глобальная переменная для хранения ID сообщений таймера
+let activeTimers = {};
+
 async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   const nowTime = Date.now();
   
@@ -44,6 +47,7 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
   
   if (cleanText.startsWith('/launchnuke')) {
     if (nowTime < config.NUKE_ACTIVATE_DATE) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Ядерное оружие еще не активировано!`);
       return true;
     }
     
@@ -76,11 +80,9 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
     
     let targetUser = data.users[targetId];
     if (!targetUser) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Игрок @${targetUsername} не найден в базе!`);
       return true;
     }
-    
-    // Функция для задержки
-    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
     
     // Отправляем начальное сообщение
     const startMsg = await sendMessageWithReturn(BOT_TOKEN, chatId,
@@ -90,13 +92,13 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
       `🔒 Отменить невозможно!`);
     
     if (!startMsg || !startMsg.message_id) {
-      await sendMessage(BOT_TOKEN, chatId, `❌ Ошибка при запуске бомбы!`);
+      await sendMessage(BOT_TOKEN, chatId, `❌ Ошибка при запуске бомбы! Попробуй еще раз.`);
       return true;
     }
     
     const messageId = startMsg.message_id;
     
-    // Обратный отсчет с 9 до 1
+    // Обратный отсчет
     for (let i = 9; i >= 1; i--) {
       await delay(1000);
       await editMessage(BOT_TOKEN, chatId, messageId,
@@ -105,14 +107,6 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
         `⏳ Осталось: ${i} секунд...\n\n` +
         `🔒 Отменить невозможно!`);
     }
-    
-    // Последняя секунда
-    await delay(1000);
-    await editMessage(BOT_TOKEN, chatId, messageId,
-      `💣 *ЗАПУСК ЯДЕРНОЙ БОМБЫ!* 💣\n\n` +
-      `🎯 Цель: @${targetName}\n\n` +
-      `⏳ Осталось: 1 секунда...\n\n` +
-      `🔒 Отменить невозможно!`);
     
     // Ракета
     await delay(1000);
@@ -166,7 +160,12 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
   return false;
 }
 
-// Вспомогательная функция для отправки сообщения и получения ответа
+// Функция для задержки
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Функция для отправки сообщения и получения ответа
 async function sendMessageWithReturn(token, chatId, text) {
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   const response = await fetch(url, {
