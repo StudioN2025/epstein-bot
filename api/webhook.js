@@ -10,6 +10,7 @@ const { handleAdminCommand } = require('./modules/admin');
 const { handleNukeCommand } = require('./modules/nuke');
 const { handleFarmCommand } = require('./modules/farm');
 const { handleBalanceCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand, handleSendSoap, handleSendChild, handleSendBasement, handleRapeCommand, handleStartCommand } = require('./modules/commands');
+const { handleActivityCommand, handleTopActivityCommand, updateActivityStats } = require('./modules/activity');
 
 let duels = {};
 
@@ -55,6 +56,14 @@ module.exports = async (req, res) => {
       
       // Загружаем данные
       let data = await loadData();
+      if (!data.users) data.users = {};
+      
+      // Обновляем статистику активности для каждого сообщения
+      data = await updateActivityStats(userId, username, data);
+      await saveData(data);
+      
+      // Перезагружаем данные после обновления статистики
+      data = await loadData();
       if (!data.users) data.users = {};
       
       let user = data.users[userId] || { 
@@ -111,7 +120,7 @@ module.exports = async (req, res) => {
       else if (await handleDeletePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
         return res.status(200).json({ ok: true });
       }
-      // Ядерная бомба (передаем isAdmin для команды removenuke)
+      // Ядерная бомба
       else if (await handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) {
         return res.status(200).json({ ok: true });
       }
@@ -155,6 +164,13 @@ module.exports = async (req, res) => {
       }
       // Фарм
       else if (await handleFarmCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+        return res.status(200).json({ ok: true });
+      }
+      // Статистика активности
+      else if (await handleActivityCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+        return res.status(200).json({ ok: true });
+      }
+      else if (await handleTopActivityCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
       // Баланс и топы
@@ -210,4 +226,4 @@ async function isUserAdmin(botToken, chatId, userId) {
     }
   }
   return false;
-    }
+       }
