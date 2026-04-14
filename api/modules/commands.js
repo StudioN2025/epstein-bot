@@ -147,7 +147,6 @@ async function handleSendSoap(cleanText, rawText, user, data, BOT_TOKEN, chatId,
     return true;
   }
   
-  // Находим получателя
   let targetId = null;
   let targetName = targetUsername;
   for (const [id, u] of Object.entries(data.users)) {
@@ -178,7 +177,6 @@ async function handleSendSoap(cleanText, rawText, user, data, BOT_TOKEN, chatId,
     return true;
   }
   
-  // Переводим
   user.balance -= amount;
   targetUser.balance = (targetUser.balance || 0) + amount;
   
@@ -326,6 +324,47 @@ async function handleSendBasement(cleanText, rawText, user, data, BOT_TOKEN, cha
   return true;
 }
 
+// ========== ШУТОЧНАЯ КОМАНДА ==========
+async function handleRapeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+  if (!cleanText.startsWith('/rape')) return false;
+  
+  const parts = rawText.split(' ');
+  if (parts.length < 2) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /rape @username`);
+    return true;
+  }
+  
+  let targetUsername = parts[1].replace('@', '');
+  let targetId = null;
+  let targetName = targetUsername;
+  
+  for (const [id, u] of Object.entries(data.users)) {
+    if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+      targetId = parseInt(id);
+      targetName = u.username;
+      break;
+    }
+  }
+  
+  if (!targetId) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Не найден игрок @${targetUsername}`);
+    return true;
+  }
+  
+  if (targetId === userId) {
+    await sendMessage(BOT_TOKEN, chatId, `${username} не насилуй себя ☝️`);
+    return true;
+  }
+  
+  const roasts = [
+    `${username} изнасиловал @${targetName}!`,
+  ];
+  
+  const randomRoast = roasts[Math.floor(Math.random() * roasts.length)];
+  await sendMessage(BOT_TOKEN, chatId, randomRoast);
+  return true;
+}
+
 async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin) {
   if (cleanText !== '/start') return false;
   
@@ -342,7 +381,8 @@ async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, cha
       `/removemobilized @user 2\n` +
       `/createpromo КОД 100 10\n` +
       `/deletepromo КОД\n` +
-      `/promolist\n`;
+      `/promolist\n` +
+      `/removenuke @user\n`;
   }
   
   let nukeCommands = '';
@@ -371,6 +411,7 @@ async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, cha
     `/sendbasement @user 2 — перевести подвалы\n` +
     `/duel @user [ставка] — дуэль\n` +
     `/casino [ставка] [число] — казино (x2 при победе)\n` +
+    `/rape @user — насмехаться над игроком\n` +
     `/promo — ввести промокод\n\n` +
     `⚔️ *ИВЕНТ СВО (до 18.04.2026):*\n` +
     `/svo — информация об ивенте\n` +
@@ -400,5 +441,6 @@ module.exports = {
   handleSendSoap,
   handleSendChild,
   handleSendBasement,
+  handleRapeCommand,
   handleStartCommand
 };
