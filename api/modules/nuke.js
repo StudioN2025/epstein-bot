@@ -1,4 +1,4 @@
-const { sendMessage, saveData } = require('./helpers');
+const { sendMessage, saveData, editMessage } = require('./helpers');
 const config = require('./config');
 
 async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
@@ -79,14 +79,63 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
       return true;
     }
     
+    // Функция для задержки
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    
+    // Отправляем начальное сообщение
+    const startMsg = await sendMessageWithReturn(BOT_TOKEN, chatId,
+      `💣 *ЗАПУСК ЯДЕРНОЙ БОМБЫ!* 💣\n\n` +
+      `🎯 Цель: @${targetName}\n\n` +
+      `⏳ Обратный отсчет: 10 секунд...\n\n` +
+      `🔒 Отменить невозможно!`);
+    
+    if (!startMsg || !startMsg.message_id) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Ошибка при запуске бомбы!`);
+      return true;
+    }
+    
+    const messageId = startMsg.message_id;
+    
+    // Обратный отсчет с 9 до 1
+    for (let i = 9; i >= 1; i--) {
+      await delay(1000);
+      await editMessage(BOT_TOKEN, chatId, messageId,
+        `💣 *ЗАПУСК ЯДЕРНОЙ БОМБЫ!* 💣\n\n` +
+        `🎯 Цель: @${targetName}\n\n` +
+        `⏳ Осталось: ${i} секунд...\n\n` +
+        `🔒 Отменить невозможно!`);
+    }
+    
+    // Последняя секунда
+    await delay(1000);
+    await editMessage(BOT_TOKEN, chatId, messageId,
+      `💣 *ЗАПУСК ЯДЕРНОЙ БОМБЫ!* 💣\n\n` +
+      `🎯 Цель: @${targetName}\n\n` +
+      `⏳ Осталось: 1 секунда...\n\n` +
+      `🔒 Отменить невозможно!`);
+    
+    // Ракета
+    await delay(1000);
+    await editMessage(BOT_TOKEN, chatId, messageId,
+      `🚀 *ПУСК!* 🚀\n\n` +
+      `Ракета с ядерной бомбой запущена!\n` +
+      `🎯 Цель: @${targetName}\n\n` +
+      `Ожидайте последствия...`);
+    
+    // Задержка перед взрывом
+    await delay(2000);
+    
+    // Тратим бомбу
     user.nukes -= 1;
     
+    // Сохраняем статистику уничтоженного
     const destroyedBalance = targetUser.balance || 0;
     const destroyedBasements = targetUser.basements || 0;
     const destroyedChildren = targetUser.children || 0;
     const destroyedMobilized = targetUser.mobilized || 0;
     const destroyedCaptured = targetUser.capturedBasements || 0;
     
+    // ПОЛНОСТЬЮ УНИЧТОЖАЕМ ВСЁ У ЦЕЛИ
     targetUser.balance = 0;
     targetUser.basements = 0;
     targetUser.children = 0;
@@ -98,8 +147,8 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
     data.users[targetId] = targetUser;
     await saveData(data);
     
-    await sendMessage(BOT_TOKEN, chatId,
-      `💥 *ЯДЕРНАЯ АТАКА!* 💥\n\n` +
+    await editMessage(BOT_TOKEN, chatId, messageId,
+      `💥 *ЯДЕРНЫЙ ВЗРЫВ!* 💥\n\n` +
       `🎯 Цель: @${targetName}\n` +
       `💣 Полное уничтожение:\n` +
       `💰 Мыло: ${destroyedBalance} 🧼 → 0\n` +
@@ -108,11 +157,25 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
       `⚔️ Мобилизованные: ${destroyedMobilized} → 0\n` +
       `🏚️ Захваченные подвалы: ${destroyedCaptured} → 0\n\n` +
       `💣 Осталось бомб: ${user.nukes}\n\n` +
+      `💀 *${targetName} был уничтожен!* 💀\n\n` +
       `🔒 Эта информация останется между нами...`);
+    
     return true;
   }
   
   return false;
+}
+
+// Вспомогательная функция для отправки сообщения и получения ответа
+async function sendMessageWithReturn(token, chatId, text) {
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' })
+  });
+  const data = await response.json();
+  return data.result;
 }
 
 module.exports = { handleNukeCommand };
