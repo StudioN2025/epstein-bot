@@ -9,7 +9,7 @@ const { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeleteProm
 const { handleAdminCommand } = require('./modules/admin');
 const { handleNukeCommand } = require('./modules/nuke');
 const { handleFarmCommand } = require('./modules/farm');
-const { handleBalanceCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand, handleSendSoap, handleSendChild, handleSendBasement, handleStartCommand } = require('./modules/commands');
+const { handleBalanceCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand, handleSendSoap, handleSendChild, handleSendBasement, handleRapeCommand, handleStartCommand } = require('./modules/commands');
 
 let duels = {};
 
@@ -111,8 +111,8 @@ module.exports = async (req, res) => {
       else if (await handleDeletePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
         return res.status(200).json({ ok: true });
       }
-      // Ядерная бомба
-      else if (await handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      // Ядерная бомба (передаем isAdmin для команды removenuke)
+      else if (await handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) {
         return res.status(200).json({ ok: true });
       }
       // Подвалы
@@ -139,6 +139,10 @@ module.exports = async (req, res) => {
         return res.status(200).json({ ok: true });
       }
       else if (await handleSendBasement(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+        return res.status(200).json({ ok: true });
+      }
+      // Шуточная команда
+      else if (await handleRapeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
       // Промокоды
@@ -206,4 +210,4 @@ async function isUserAdmin(botToken, chatId, userId) {
     }
   }
   return false;
-       }
+    }
