@@ -1,14 +1,12 @@
-const { sendMessage, saveData, editMessage } = require('./helpers');
+const { sendMessage, saveData } = require('./helpers');
 const config = require('./config');
 
-// Глобальная переменная для хранения ID сообщений таймера
-let activeTimers = {};
-
-async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin) {
   const nowTime = Date.now();
   
   if (cleanText === '/buynuke') {
     if (nowTime < config.NUKE_ACTIVATE_DATE) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Ядерное оружие станет доступно после 16 апреля 2026!`);
       return true;
     }
     
@@ -33,6 +31,7 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
   
   if (cleanText === '/mynukes') {
     if (nowTime < config.NUKE_ACTIVATE_DATE) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Ядерное оружие станет доступно после 16 апреля 2026!`);
       return true;
     }
     
@@ -45,15 +44,64 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
     return true;
   }
   
-  if (cleanText.startsWith('/launchnuke')) {
-    if (nowTime < config.NUKE_ACTIVATE_DATE) {
-      await sendMessage(BOT_TOKEN, chatId, `❌ Ядерное оружие еще не активировано!`);
+  // АДМИН-КОМАНДА: удалить ядерные бомбы у пользователя
+  if (cleanText.startsWith('/removenuke')) {
+    if (!isAdmin) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Эта команда только для админов!`);
       return true;
     }
     
     const parts = rawText.split(' ');
     if (parts.length < 2) {
-      await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /launchnuke @username`);
+      await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /removenuke @username`);
+      return true;
+    }
+    
+    let targetUsername = parts[1].replace('@', '');
+    let targetId = null;
+    let targetName = targetUsername;
+    
+    for (const [id, u] of Object.entries(data.users)) {
+      if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+        targetId = parseInt(id);
+        targetName = u.username;
+        break;
+      }
+    }
+    
+    if (!targetId) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Не найден игрок @${targetUsername}`);
+      return true;
+    }
+    
+    let targetUser = data.users[targetId];
+    if (!targetUser) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Игрок @${targetUsername} не найден в базе!`);
+      return true;
+    }
+    
+    const removedNukes = targetUser.nukes || 0;
+    targetUser.nukes = 0;
+    data.users[targetId] = targetUser;
+    await saveData(data);
+    
+    await sendMessage(BOT_TOKEN, chatId,
+      `💣 *БОМБЫ УДАЛЕНЫ* 💣\n\n` +
+      `👑 Админ ${username} удалил все ядерные бомбы у @${targetName}\n` +
+      `💣 Удалено бомб: ${removedNukes}\n\n` +
+      `🔒 Теперь у @${targetName} нет ядерного оружия.`);
+    return true;
+  }
+  
+  if (cleanText.startsWith('/launchnuke')) {
+    if (nowTime < config.NUKE_ACTIVATE_DATE) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Ядерное оружие станет доступно после 16 апреля 2026!`);
+      return true;
+    }
+    
+    const parts = rawText.split(' ');
+    if (parts.length < 2) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Пример: /launchnuke @username\n\nНельзя атаковать бота! Только реальных игроков.`);
       return true;
     }
     
@@ -63,6 +111,13 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
     }
     
     let targetUsername = parts[1].replace('@', '');
+    
+    // Защита от атаки на бота
+    if (targetUsername.toLowerCase() === 'epstain_bot' || targetUsername.toLowerCase() === 'epstein_bot') {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Нельзя атаковать бота! Только реальных игроков.`);
+      return true;
+    }
+    
     let targetId = null;
     let targetName = targetUsername;
     for (const [id, u] of Object.entries(data.users)) {
@@ -73,8 +128,13 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
       }
     }
     
-    if (!targetId || targetId === userId) {
-      await sendMessage(BOT_TOKEN, chatId, `❌ Не найден игрок @${targetUsername} или это ты сам!`);
+    if (!targetId) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Не найден игрок @${targetUsername}\n\nУбедись, что игрок зарегистрирован в боте (напиши /start).`);
+      return true;
+    }
+    
+    if (targetId === userId) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Нельзя запустить ядерную бомбу на самого себя!`);
       return true;
     }
     
@@ -84,52 +144,15 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
       return true;
     }
     
-    // Отправляем начальное сообщение
-    const startMsg = await sendMessageWithReturn(BOT_TOKEN, chatId,
-      `💣 *ЗАПУСК ЯДЕРНОЙ БОМБЫ!* 💣\n\n` +
-      `🎯 Цель: @${targetName}\n\n` +
-      `⏳ Обратный отсчет: 10 секунд...\n\n` +
-      `🔒 Отменить невозможно!`);
-    
-    if (!startMsg || !startMsg.message_id) {
-      await sendMessage(BOT_TOKEN, chatId, `❌ Ошибка при запуске бомбы! Попробуй еще раз.`);
-      return true;
-    }
-    
-    const messageId = startMsg.message_id;
-    
-    // Обратный отсчет
-    for (let i = 9; i >= 1; i--) {
-      await delay(1000);
-      await editMessage(BOT_TOKEN, chatId, messageId,
-        `💣 *ЗАПУСК ЯДЕРНОЙ БОМБЫ!* 💣\n\n` +
-        `🎯 Цель: @${targetName}\n\n` +
-        `⏳ Осталось: ${i} секунд...\n\n` +
-        `🔒 Отменить невозможно!`);
-    }
-    
-    // Ракета
-    await delay(1000);
-    await editMessage(BOT_TOKEN, chatId, messageId,
-      `🚀 *ПУСК!* 🚀\n\n` +
-      `Ракета с ядерной бомбой запущена!\n` +
-      `🎯 Цель: @${targetName}\n\n` +
-      `Ожидайте последствия...`);
-    
-    // Задержка перед взрывом
-    await delay(2000);
-    
-    // Тратим бомбу
+    // Запуск бомбы
     user.nukes -= 1;
     
-    // Сохраняем статистику уничтоженного
     const destroyedBalance = targetUser.balance || 0;
     const destroyedBasements = targetUser.basements || 0;
     const destroyedChildren = targetUser.children || 0;
     const destroyedMobilized = targetUser.mobilized || 0;
     const destroyedCaptured = targetUser.capturedBasements || 0;
     
-    // ПОЛНОСТЬЮ УНИЧТОЖАЕМ ВСЁ У ЦЕЛИ
     targetUser.balance = 0;
     targetUser.basements = 0;
     targetUser.children = 0;
@@ -141,8 +164,8 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
     data.users[targetId] = targetUser;
     await saveData(data);
     
-    await editMessage(BOT_TOKEN, chatId, messageId,
-      `💥 *ЯДЕРНЫЙ ВЗРЫВ!* 💥\n\n` +
+    await sendMessage(BOT_TOKEN, chatId,
+      `💥 *ЯДЕРНАЯ АТАКА!* 💥\n\n` +
       `🎯 Цель: @${targetName}\n` +
       `💣 Полное уничтожение:\n` +
       `💰 Мыло: ${destroyedBalance} 🧼 → 0\n` +
@@ -151,30 +174,12 @@ async function handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
       `⚔️ Мобилизованные: ${destroyedMobilized} → 0\n` +
       `🏚️ Захваченные подвалы: ${destroyedCaptured} → 0\n\n` +
       `💣 Осталось бомб: ${user.nukes}\n\n` +
-      `💀 *${targetName} был уничтожен!* 💀\n\n` +
       `🔒 Эта информация останется между нами...`);
     
     return true;
   }
   
   return false;
-}
-
-// Функция для задержки
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Функция для отправки сообщения и получения ответа
-async function sendMessageWithReturn(token, chatId, text) {
-  const url = `https://api.telegram.org/bot${token}/sendMessage`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' })
-  });
-  const data = await response.json();
-  return data.result;
 }
 
 module.exports = { handleNukeCommand };
