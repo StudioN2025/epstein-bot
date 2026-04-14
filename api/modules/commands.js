@@ -382,7 +382,9 @@ async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, cha
       `/createpromo КОД 100 10\n` +
       `/deletepromo КОД\n` +
       `/promolist\n` +
-      `/removenuke @user\n`;
+      `/removenuke @user\n` +
+      `/activity — моя статистика активности\n` +
+      `/topactivity [hour/day/week/total] — топ активности\n`;
   }
   
   let nukeCommands = '';
