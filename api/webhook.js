@@ -5,7 +5,7 @@ const { handleBasementCommand } = require('./modules/basements');
 const { handleChildCommand } = require('./modules/children');
 const { handleSvoCommand } = require('./modules/svo');
 const { handleCasinoCommand } = require('./modules/casino');
-const { handlePromoCommand } = require('./modules/promo');
+const { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } = require('./modules/promo');
 const { handleAdminCommand } = require('./modules/admin');
 const { handleNukeCommand } = require('./modules/nuke');
 const { handleFarmCommand } = require('./modules/farm');
@@ -97,37 +97,57 @@ module.exports = async (req, res) => {
       // Проверка на админа
       const isAdmin = await isUserAdmin(BOT_TOKEN, chatId, userId);
       
-      // Обработка команд
+      // ========== АДМИН-КОМАНДЫ ==========
       if (await handleAdminCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
         return res.status(200).json({ ok: true });
       }
+      // Админ-команды промокодов
+      else if (await handleCreatePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
+        return res.status(200).json({ ok: true });
+      }
+      else if (await handlePromoList(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
+        return res.status(200).json({ ok: true });
+      }
+      else if (await handleDeletePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
+        return res.status(200).json({ ok: true });
+      }
+      // Ядерная бомба
       else if (await handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
+      // Подвалы
       else if (await handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
+      // Дети
       else if (await handleChildCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
+      // СВО
       else if (await handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
+      // Казино
       else if (await handleCasinoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
+      // Промокоды
       else if (await handlePromoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
+      // Дуэли
       else if (await handleDuelCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, duels)) {
         return res.status(200).json({ ok: true });
       }
+      // Фарм
       else if (await handleFarmCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
+      // Баланс
       else if (await handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
+      // Топы
       else if (await handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
@@ -140,6 +160,7 @@ module.exports = async (req, res) => {
       else if (await handleTopMobilizedCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
+      // Старт
       else if (await handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) {
         return res.status(200).json({ ok: true });
       }
@@ -171,8 +192,9 @@ async function isUserAdmin(botToken, chatId, userId) {
       }
       return false;
     } catch (error) {
+      console.error('Admin check error:', error);
       return false;
     }
   }
   return false;
-}
+                                 }
