@@ -411,7 +411,7 @@ async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, cha
     `/sendbasement @user 2 — перевести подвалы\n` +
     `/duel @user [ставка] — дуэль\n` +
     `/casino [ставка] [число] — казино (x2 при победе)\n` +
-    `/rape @user — насмехаться над игроком\n` +
+    `/rape @user — изнасиловать человека\n` +
     `/promo — ввести промокод\n\n` +
     `⚔️ *ИВЕНТ СВО (до 18.04.2026):*\n` +
     `/svo — информация об ивенте\n` +
