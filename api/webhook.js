@@ -9,7 +9,7 @@ const { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeleteProm
 const { handleAdminCommand } = require('./modules/admin');
 const { handleNukeCommand } = require('./modules/nuke');
 const { handleFarmCommand } = require('./modules/farm');
-const { handleBalanceCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand, handleStartCommand } = require('./modules/commands');
+const { handleBalanceCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand, handleSendSoap, handleSendChild, handleSendBasement, handleStartCommand } = require('./modules/commands');
 
 let duels = {};
 
@@ -131,6 +131,16 @@ module.exports = async (req, res) => {
       else if (await handleCasinoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
+      // Переводы
+      else if (await handleSendSoap(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+        return res.status(200).json({ ok: true });
+      }
+      else if (await handleSendChild(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+        return res.status(200).json({ ok: true });
+      }
+      else if (await handleSendBasement(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+        return res.status(200).json({ ok: true });
+      }
       // Промокоды
       else if (await handlePromoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
@@ -143,11 +153,10 @@ module.exports = async (req, res) => {
       else if (await handleFarmCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      // Баланс
+      // Баланс и топы
       else if (await handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
-      // Топы
       else if (await handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
         return res.status(200).json({ ok: true });
       }
@@ -197,4 +206,4 @@ async function isUserAdmin(botToken, chatId, userId) {
     }
   }
   return false;
-                                 }
+       }
