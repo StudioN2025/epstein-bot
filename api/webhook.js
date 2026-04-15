@@ -8,7 +8,6 @@ const { handleSvoCommand } = require('./modules/svo');
 const { handleCasinoCommand } = require('./modules/casino');
 const { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } = require('./modules/promo');
 const { handleNukeCommand } = require('./modules/nuke');
-const { handleSendSoap, handleSendChild, handleSendBasement } = require('./modules/trade');
 const { handleActivityCommand, handleTopActivityCommand, updateActivityStats } = require('./modules/activity');
 const { handleStartCommand } = require('./modules/start');
 const { handleStartCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand } = require('./modules/start');
