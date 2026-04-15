@@ -1,7 +1,4 @@
-// ========== EDGE RUNTIME ДЛЯ МАКСИМАЛЬНОЙ СКОРОСТИ ==========
-export const runtime = 'edge';
-export const preferredRegion = 'fra1';
-
+// ========== OPTIMIZED NODE.JS RUNTIME ==========
 import { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, startWarmup } from './modules/helpers.js';
 import config from './modules/config.js';
 
@@ -24,27 +21,50 @@ let duels = {};
 let adminCache = {};
 let adminCacheTime = {};
 
-// Главный обработчик
-export default async function handler(req) {
+// Кэшированная проверка админа
+async function isAdminCheck(botToken, chatId, userId) {
+  if (userId === config.ADMIN_USER_ID) return true;
+  
+  const cacheKey = `${chatId}_${userId}`;
+  if (adminCache[cacheKey] && (Date.now() - adminCacheTime[cacheKey]) < 60000) {
+    return adminCache[cacheKey];
+  }
+  
+  if (chatId !== config.ALLOWED_CHAT_ID) return false;
+  
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/getChatMember`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, user_id: userId })
+    });
+    const data = await response.json();
+    const isAdmin = data.ok && (data.result.status === 'creator' || data.result.status === 'administrator');
+    adminCache[cacheKey] = isAdmin;
+    adminCacheTime[cacheKey] = Date.now();
+    return isAdmin;
+  } catch (error) {
+    return false;
+  }
+}
+
+export default async function handler(req, res) {
   const BOT_TOKEN = process.env.BOT_TOKEN;
   
   // GET запрос — проверка жизни и self-ping
   if (req.method === 'GET') {
     startWarmup(BOT_TOKEN);
-    return new Response(JSON.stringify({ ok: true, message: 'Epstain Bot 🧼', time: Date.now() }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return res.status(200).json({ ok: true, message: 'Epstain Bot 🧼', time: Date.now() });
   }
   
   // Только POST
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
   
   try {
-    // Парсим тело запроса (для Edge Runtime)
-    const update = await req.json();
+    const update = req.body;
     
     // ========== CALLBACK КНОПКИ (ДУЭЛИ) ==========
     if (update.callback_query) {
@@ -52,12 +72,12 @@ export default async function handler(req) {
       if (cbData.startsWith('accept_') || cbData.startsWith('aim_') || cbData.startsWith('break_') || cbData.startsWith('shoot_')) {
         await handleDuelCallback(update, BOT_TOKEN, duels);
       }
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // ========== ОБЫЧНЫЕ СООБЩЕНИЯ ==========
     if (!update.message?.text) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     const chatId = update.message.chat.id;
@@ -69,7 +89,7 @@ export default async function handler(req) {
     // Проверка прав доступа
     if (chatId !== config.ALLOWED_CHAT_ID && !isAdminPrivate(userId, update.message.chat.type)) {
       await sendMessage(BOT_TOKEN, chatId, `🧼 Детское мыло только на острове: ${config.GROUP_INVITE_LINK}`);
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // Загрузка данных с кэшем
@@ -104,7 +124,7 @@ export default async function handler(req) {
     if (user.mutedUntil && user.mutedUntil > Math.floor(Date.now() / 1000)) {
       const remaining = user.mutedUntil - Math.floor(Date.now() / 1000);
       await sendMessage(BOT_TOKEN, chatId, `🔇 ${username}, мут ${Math.ceil(remaining / 60)} мин!`);
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // Проверка админа (с кэшем)
@@ -115,126 +135,98 @@ export default async function handler(req) {
     
     // Админ-команды
     if (await handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     if (await handleCreatePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     if (await handlePromoList(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     if (await handleDeletePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // Ядерка
     if (await handleNukeCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // Подвалы и дети
     if (await handleBasementCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     if (await handleChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // СВО
     if (await handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // Казино
     if (await handleCasinoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // Переводы
     if (await handleSendSoap(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     if (await handleSendChild(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     if (await handleSendBasement(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // Промокоды
     if (await handlePromoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // Дуэли
     if (await handleDuelCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, duels)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // Фарм
     if (await handleFarmCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // Статистика
     if (await handleActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     if (await handleTopActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // Топы
     if (await handleTopCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     if (await handleTopChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     if (await handleTopBasementsCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     if (await handleTopMobilizedCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
     // Старт
     if (await handleStartCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      return res.status(200).json({ ok: true });
     }
     
-    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    return res.status(200).json({ ok: true });
     
   } catch (error) {
     console.error('Error:', error);
-    return new Response(JSON.stringify({ ok: false, error: error.message }), { status: 200 });
-  }
-}
-
-// Кэшированная проверка админа
-async function isAdminCheck(botToken, chatId, userId) {
-  if (userId === config.ADMIN_USER_ID) return true;
-  
-  const cacheKey = `${chatId}_${userId}`;
-  if (adminCache[cacheKey] && (Date.now() - adminCacheTime[cacheKey]) < 60000) {
-    return adminCache[cacheKey];
-  }
-  
-  if (chatId !== config.ALLOWED_CHAT_ID) return false;
-  
-  try {
-    const url = `https://api.telegram.org/bot${botToken}/getChatMember`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, user_id: userId })
-    });
-    const data = await response.json();
-    const isAdmin = data.ok && (data.result.status === 'creator' || data.result.status === 'administrator');
-    adminCache[cacheKey] = isAdmin;
-    adminCacheTime[cacheKey] = Date.now();
-    return isAdmin;
-  } catch (error) {
-    return false;
+    return res.status(200).json({ ok: false, error: error.message });
   }
 }
