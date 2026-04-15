@@ -1,6 +1,6 @@
 const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, startWarmup } = require('./modules/helpers');
 const config = require('./modules/config');
-const { handleAdminCommand } = require('./modules/admin');
+const { handleStartCommand, handleAdminCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand } = require('./modules/start');
 const { handleFarmCommand } = require('./modules/farm');
 const { handleChildrenCommand, handleBasementCommand } = require('./modules/children');
 const { handleDuelCallback, handleDuelCommand } = require('./modules/duel');
