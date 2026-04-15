@@ -1,229 +1,218 @@
-const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, collectChildIncome, collectCapturedBasementsIncome } = require('./modules/helpers');
-const config = require('./modules/config');
-const { handleDuelCallback, handleDuelCommand } = require('./modules/duels');
-const { handleBasementCommand } = require('./modules/basements');
-const { handleChildCommand } = require('./modules/children');
-const { handleSvoCommand } = require('./modules/svo');
-const { handleCasinoCommand } = require('./modules/casino');
-const { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } = require('./modules/promo');
-const { handleAdminCommand } = require('./modules/admin');
-const { handleNukeCommand } = require('./modules/nuke');
-const { handleFarmCommand } = require('./modules/farm');
-const { handleBalanceCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand, handleSendSoap, handleSendChild, handleSendBasement, handleRapeCommand, handleStartCommand } = require('./modules/commands');
-const { handleActivityCommand, handleTopActivityCommand, updateActivityStats } = require('./modules/activity');
+// ========== EDGE RUNTIME ДЛЯ МАКСИМАЛЬНОЙ СКОРОСТИ ==========
+export const runtime = 'edge';
+export const preferredRegion = 'fra1'; // Frankfurt - ближе к России
 
+import { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, startWarmup } from './modules/helpers.js';
+import config from './modules/config.js';
+
+// Импорт обработчиков команд
+import { handleAdminCommand } from './modules/admin.js';
+import { handleFarmCommand } from './modules/farm.js';
+import { handleChildrenCommand, handleBasementCommand } from './modules/children.js';
+import { handleDuelCallback, handleDuelCommand } from './modules/duel.js';
+import { handleSvoCommand } from './modules/svo.js';
+import { handleCasinoCommand } from './modules/casino.js';
+import { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } from './modules/promo.js';
+import { handleNukeCommand } from './modules/nuke.js';
+import { handleSendSoap, handleSendChild, handleSendBasement } from './modules/trade.js';
+import { handleActivityCommand, handleTopActivityCommand, updateActivityStats } from './modules/activity.js';
+import { handleStartCommand } from './modules/start.js';
+import { handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand } from './modules/top.js';
+
+// Кэш для дуэлей (в памяти)
 let duels = {};
 
-module.exports = async (req, res) => {
+// Главный обработчик
+export default async function handler(req, res) {
   const BOT_TOKEN = process.env.BOT_TOKEN;
   
+  // GET запрос — проверка жизни и self-ping
   if (req.method === 'GET') {
-    return res.status(200).json({ ok: true, message: 'Epstain Bot 🧼' });
+    startWarmup(BOT_TOKEN);
+    return new Response(JSON.stringify({ ok: true, message: 'Epstain Bot 🧼', time: Date.now() }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
   
-  if (req.method === 'POST') {
-    try {
-      const update = req.body;
-      
-      // Обработка callback кнопок
-      if (update.callback_query) {
-        const callback = update.callback_query;
-        const cbData = callback.data;
-        
-        // Дуэли
-        if (cbData.startsWith('accept_') || cbData.startsWith('aim_') || cbData.startsWith('break_') || cbData.startsWith('shoot_')) {
-          return await handleDuelCallback(update, BOT_TOKEN, duels);
-        }
+  // Только POST
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+  }
+  
+  try {
+    const update = await req.json();
+    
+    // ========== CALLBACK КНОПКИ (ДУЭЛИ) ==========
+    if (update.callback_query) {
+      const cbData = update.callback_query.data;
+      if (cbData.startsWith('accept_') || cbData.startsWith('aim_') || cbData.startsWith('break_') || cbData.startsWith('shoot_')) {
+        await handleDuelCallback(update, BOT_TOKEN, duels);
       }
-      
-      // Обработка обычных сообщений
-      if (!update.message || !update.message.text) {
-        return res.status(200).json({ ok: true });
-      }
-      
-      const chatId = update.message.chat.id;
-      const userId = update.message.from.id;
-      const username = update.message.from.username || update.message.from.first_name;
-      const rawText = update.message.text;
-      const cleanText = cleanCommand(rawText);
-      
-      // Проверка прав доступа
-      const isAdminPrivateChat = isAdminPrivate(userId, update.message.chat.type);
-      if (chatId !== config.ALLOWED_CHAT_ID && !isAdminPrivateChat) {
-        await sendMessage(BOT_TOKEN, chatId, `🧼 Детское мыло только на острове: ${config.GROUP_INVITE_LINK}`);
-        return res.status(200).json({ ok: true });
-      }
-      
-      // Загружаем данные
-      let data = await loadData();
-      if (!data.users) data.users = {};
-      
-      // Обновляем статистику активности для каждого сообщения
-      data = await updateActivityStats(userId, username, data);
-      await saveData(data);
-      
-      // Перезагружаем данные после обновления статистики
-      data = await loadData();
-      if (!data.users) data.users = {};
-      
-      let user = data.users[userId] || { 
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // ========== ОБЫЧНЫЕ СООБЩЕНИЯ ==========
+    if (!update.message?.text) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    const chatId = update.message.chat.id;
+    const userId = update.message.from.id;
+    const username = update.message.from.username || update.message.from.first_name;
+    const rawText = update.message.text;
+    const cleanText = cleanCommand(rawText);
+    
+    // Проверка прав доступа
+    if (chatId !== config.ALLOWED_CHAT_ID && !isAdminPrivate(userId, update.message.chat.type)) {
+      await sendMessage(BOT_TOKEN, chatId, `🧼 Детское мыло только на острове: ${config.GROUP_INVITE_LINK}`);
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // Загрузка данных с кэшем
+    let data = await loadData();
+    if (!data.users) data.users = {};
+    
+    // Обновление статистики активности
+    data = await updateActivityStats(userId, username, data);
+    await saveData(data);
+    
+    // Создание/загрузка пользователя
+    let user = data.users[userId];
+    if (!user) {
+      user = { 
         balance: 0, children: 0, basements: 0, username: username, lastFarm: 0, mutedUntil: 0, lastChildIncome: Date.now(),
         mobilized: 0, capturedBasements: 0, capturedBasementsDetails: [], lastCapturedIncome: Date.now(),
         nukes: 0
       };
-      if (user.children === undefined) user.children = 0;
-      if (user.basements === undefined) user.basements = 0;
-      if (user.mobilized === undefined) user.mobilized = 0;
-      if (user.capturedBasements === undefined) user.capturedBasements = 0;
-      if (!user.capturedBasementsDetails) user.capturedBasementsDetails = [];
-      if (user.nukes === undefined) user.nukes = 0;
-      if (!user.lastChildIncome) user.lastChildIncome = Date.now();
-      if (!user.lastCapturedIncome) user.lastCapturedIncome = Date.now();
-      
-      // Начисляем пассивный доход
-      const now = Date.now();
-      const childIncome = await collectChildIncome(user, now);
-      if (childIncome > 0) {
-        user.lastChildIncome = now;
-        data.users[userId] = user;
-        await saveData(data);
-      }
-      
-      const capturedIncome = await collectCapturedBasementsIncome(user, now);
-      if (capturedIncome > 0) {
-        user.lastCapturedIncome = now;
-        data.users[userId] = user;
-        await saveData(data);
-      }
-      
-      // Проверка мута
-      if (user.mutedUntil && user.mutedUntil > Math.floor(Date.now() / 1000)) {
-        const remaining = user.mutedUntil - Math.floor(Date.now() / 1000);
-        await sendMessage(BOT_TOKEN, chatId, `🔇 ${username}, мут ${Math.ceil(remaining / 60)} мин!`);
-        return res.status(200).json({ ok: true });
-      }
-      
-      // Проверка на админа
-      const isAdmin = await isUserAdmin(BOT_TOKEN, chatId, userId);
-      
-      // ========== АДМИН-КОМАНДЫ ==========
-      if (await handleAdminCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Админ-команды промокодов
-      else if (await handleCreatePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
-        return res.status(200).json({ ok: true });
-      }
-      else if (await handlePromoList(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
-        return res.status(200).json({ ok: true });
-      }
-      else if (await handleDeletePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Ядерная бомба
-      else if (await handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Подвалы
-      else if (await handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Дети
-      else if (await handleChildCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      // СВО
-      else if (await handleSvoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Казино
-      else if (await handleCasinoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Переводы
-      else if (await handleSendSoap(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      else if (await handleSendChild(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      else if (await handleSendBasement(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Шуточная команда
-      else if (await handleRapeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Промокоды
-      else if (await handlePromoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Дуэли
-      else if (await handleDuelCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, duels)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Фарм
-      else if (await handleFarmCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Статистика активности
-      else if (await handleActivityCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      else if (await handleTopActivityCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Баланс и топы
-      else if (await handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      else if (await handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      else if (await handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      else if (await handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      else if (await handleTopMobilizedCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
-        return res.status(200).json({ ok: true });
-      }
-      // Старт
-      else if (await handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) {
-        return res.status(200).json({ ok: true });
-      }
-      
-      return res.status(200).json({ ok: true });
-    } catch (error) {
-      console.error('Error:', error);
-      return res.status(200).json({ ok: false, error: error.message });
+      data.users[userId] = user;
+      await saveData(data);
     }
+    
+    // Инициализация полей
+    user.children ??= 0;
+    user.basements ??= 0;
+    user.mobilized ??= 0;
+    user.capturedBasements ??= 0;
+    user.capturedBasementsDetails ??= [];
+    user.nukes ??= 0;
+    
+    // Проверка мута
+    if (user.mutedUntil && user.mutedUntil > Math.floor(Date.now() / 1000)) {
+      const remaining = user.mutedUntil - Math.floor(Date.now() / 1000);
+      await sendMessage(BOT_TOKEN, chatId, `🔇 ${username}, мут ${Math.ceil(remaining / 60)} мин!`);
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // Проверка админа
+    const isAdmin = await isAdminCheck(BOT_TOKEN, chatId, userId);
+    
+    // ========== ОБРАБОТКА КОМАНД (быстрый switch через объект) ==========
+    const cmd = cleanText.split(' ')[0];
+    
+    const handlers = {
+      // Админ-команды
+      '/addsoap': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
+      '/removesoap': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
+      '/addchild': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
+      '/removechild': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
+      '/addbasement': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
+      '/removebasement': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
+      '/addmobilized': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
+      '/removemobilized': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
+      '/createpromo': () => handleCreatePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
+      '/deletepromo': () => handleDeletePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
+      '/promolist': () => handlePromoList(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
+      '/removenuke': () => handleNukeCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin),
+      
+      // Основные команды
+      '/farm': () => handleFarmCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/buybasement': () => handleBasementCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/basements': () => handleBasementCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/buychild': () => handleChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/children': () => handleChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      
+      // Дуэли
+      '/duel': () => handleDuelCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, duels),
+      
+      // СВО
+      '/svo': () => handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/mobilize': () => handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/attack': () => handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/free': () => handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/myarmy': () => handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/mycaptured': () => handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      
+      // Казино
+      '/casino': () => handleCasinoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      
+      // Переводы
+      '/sendsoap': () => handleSendSoap(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/sendchild': () => handleSendChild(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/sendbasement': () => handleSendBasement(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      
+      // Промокоды
+      '/promo': () => handlePromoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      
+      // Ядерка
+      '/buynuke': () => handleNukeCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin),
+      '/launchnuke': () => handleNukeCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin),
+      '/mynukes': () => handleNukeCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin),
+      
+      // Статистика
+      '/activity': () => handleActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/topactivity': () => handleTopActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      
+      // Топы
+      '/top': () => handleTopCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/topchildren': () => handleTopChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/topbasements': () => handleTopBasementsCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      '/topmobilized': () => handleTopMobilizedCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
+      
+      // Старт
+      '/start': () => handleStartCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)
+    };
+    
+    const handler = handlers[cmd];
+    if (handler) {
+      await handler();
+    }
+    
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    
+  } catch (error) {
+    console.error('Error:', error);
+    return new Response(JSON.stringify({ ok: false, error: error.message }), { status: 200 });
+  }
+}
+
+// Кэшированная проверка админа
+let adminCache = {};
+let adminCacheTime = {};
+
+async function isAdminCheck(botToken, chatId, userId) {
+  if (userId === config.ADMIN_USER_ID) return true;
+  
+  const cacheKey = `${chatId}_${userId}`;
+  if (adminCache[cacheKey] && (Date.now() - adminCacheTime[cacheKey]) < 60000) {
+    return adminCache[cacheKey];
   }
   
-  return res.status(405).json({ error: 'Method not allowed' });
-};
-
-async function isUserAdmin(botToken, chatId, userId) {
-  if (userId === config.ADMIN_USER_ID) return true;
-  if (chatId === config.ALLOWED_CHAT_ID) {
-    try {
-      const url = `https://api.telegram.org/bot${botToken}/getChatMember`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, user_id: userId })
-      });
-      const data = await response.json();
-      if (data.ok && data.result) {
-        const status = data.result.status;
-        return status === 'creator' || status === 'administrator';
-      }
-      return false;
-    } catch (error) {
-      console.error('Admin check error:', error);
-      return false;
-    }
+  if (chatId !== config.ALLOWED_CHAT_ID) return false;
+  
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/getChatMember`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, user_id: userId })
+    });
+    const data = await response.json();
+    const isAdmin = data.ok && (data.result.status === 'creator' || data.result.status === 'administrator');
+    adminCache[cacheKey] = isAdmin;
+    adminCacheTime[cacheKey] = Date.now();
+    return isAdmin;
+  } catch (error) {
+    return false;
   }
-  return false;
-       }
+}
