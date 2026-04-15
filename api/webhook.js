@@ -1,6 +1,6 @@
 // ========== EDGE RUNTIME ДЛЯ МАКСИМАЛЬНОЙ СКОРОСТИ ==========
 export const runtime = 'edge';
-export const preferredRegion = 'fra1'; // Frankfurt - ближе к России
+export const preferredRegion = 'fra1';
 
 import { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, startWarmup } from './modules/helpers.js';
 import config from './modules/config.js';
@@ -19,11 +19,13 @@ import { handleActivityCommand, handleTopActivityCommand, updateActivityStats } 
 import { handleStartCommand } from './modules/start.js';
 import { handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand } from './modules/top.js';
 
-// Кэш для дуэлей (в памяти)
+// Кэш для дуэлей и админов
 let duels = {};
+let adminCache = {};
+let adminCacheTime = {};
 
 // Главный обработчик
-export default async function handler(req, res) {
+export default async function handler(req) {
   const BOT_TOKEN = process.env.BOT_TOKEN;
   
   // GET запрос — проверка жизни и self-ping
@@ -41,6 +43,7 @@ export default async function handler(req, res) {
   }
   
   try {
+    // Парсим тело запроса (для Edge Runtime)
     const update = await req.json();
     
     // ========== CALLBACK КНОПКИ (ДУЭЛИ) ==========
@@ -104,78 +107,100 @@ export default async function handler(req, res) {
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }
     
-    // Проверка админа
+    // Проверка админа (с кэшем)
     const isAdmin = await isAdminCheck(BOT_TOKEN, chatId, userId);
     
-    // ========== ОБРАБОТКА КОМАНД (быстрый switch через объект) ==========
+    // ========== ОБРАБОТКА КОМАНД ==========
     const cmd = cleanText.split(' ')[0];
     
-    const handlers = {
-      // Админ-команды
-      '/addsoap': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
-      '/removesoap': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
-      '/addchild': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
-      '/removechild': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
-      '/addbasement': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
-      '/removebasement': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
-      '/addmobilized': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
-      '/removemobilized': () => handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
-      '/createpromo': () => handleCreatePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
-      '/deletepromo': () => handleDeletePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
-      '/promolist': () => handlePromoList(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin),
-      '/removenuke': () => handleNukeCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin),
-      
-      // Основные команды
-      '/farm': () => handleFarmCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/buybasement': () => handleBasementCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/basements': () => handleBasementCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/buychild': () => handleChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/children': () => handleChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      
-      // Дуэли
-      '/duel': () => handleDuelCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, duels),
-      
-      // СВО
-      '/svo': () => handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/mobilize': () => handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/attack': () => handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/free': () => handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/myarmy': () => handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/mycaptured': () => handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      
-      // Казино
-      '/casino': () => handleCasinoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      
-      // Переводы
-      '/sendsoap': () => handleSendSoap(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/sendchild': () => handleSendChild(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/sendbasement': () => handleSendBasement(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      
-      // Промокоды
-      '/promo': () => handlePromoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      
-      // Ядерка
-      '/buynuke': () => handleNukeCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin),
-      '/launchnuke': () => handleNukeCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin),
-      '/mynukes': () => handleNukeCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin),
-      
-      // Статистика
-      '/activity': () => handleActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/topactivity': () => handleTopActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      
-      // Топы
-      '/top': () => handleTopCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/topchildren': () => handleTopChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/topbasements': () => handleTopBasementsCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      '/topmobilized': () => handleTopMobilizedCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId),
-      
-      // Старт
-      '/start': () => handleStartCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)
-    };
+    // Админ-команды
+    if (await handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    if (await handleCreatePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    if (await handlePromoList(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    if (await handleDeletePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
     
-    const handler = handlers[cmd];
-    if (handler) {
-      await handler();
+    // Ядерка
+    if (await handleNukeCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // Подвалы и дети
+    if (await handleBasementCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    if (await handleChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // СВО
+    if (await handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // Казино
+    if (await handleCasinoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // Переводы
+    if (await handleSendSoap(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    if (await handleSendChild(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    if (await handleSendBasement(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // Промокоды
+    if (await handlePromoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // Дуэли
+    if (await handleDuelCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, duels)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // Фарм
+    if (await handleFarmCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // Статистика
+    if (await handleActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    if (await handleTopActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // Топы
+    if (await handleTopCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    if (await handleTopChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    if (await handleTopBasementsCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    if (await handleTopMobilizedCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    
+    // Старт
+    if (await handleStartCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) {
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }
     
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
@@ -187,9 +212,6 @@ export default async function handler(req, res) {
 }
 
 // Кэшированная проверка админа
-let adminCache = {};
-let adminCacheTime = {};
-
 async function isAdminCheck(botToken, chatId, userId) {
   if (userId === config.ADMIN_USER_ID) return true;
   
