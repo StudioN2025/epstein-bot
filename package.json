@@ -1,0 +1,15 @@
+{
+  "name": "epstain-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for Epstein Island",
+  "main": "api/webhook.js",
+  "scripts": {
+    "start": "node api/webhook.js",
+    "dev": "vercel dev"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "engines": {
+    "node": "18.x"
+  }
+}
