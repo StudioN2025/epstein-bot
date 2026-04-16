@@ -1,4 +1,5 @@
-﻿const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, startWarmup } = require('./modules/helpers');
+const { updateActivityStats } = require('./modules/activity');
+const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, startWarmup } = require('./modules/helpers');
 const config = require('./modules/config');
 
 // Импорты команд – теперь все в одном объекте для быстрого доступа
