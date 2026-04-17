@@ -46,6 +46,42 @@ async function isAdminCheck(botToken, chatId, userId) {
 
 let dataChanged = false;
 
+// Функция для /balance
+async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+  if (cleanText !== '/balance') return false;
+  
+  const hourlyIncome = (user.children || 0) * config.CHILD_INCOME;
+  const capturedIncome = (user.capturedBasements || 0) * config.BASEMENT_CAPTURE_REWARD;
+  const userBasements = user.basements || 0;
+  const maxChildrenPossible = userBasements * config.CHILDREN_PER_BASEMENT;
+  
+  let nukeInfo = '';
+  if (Date.now() >= config.NUKE_ACTIVATE_DATE && (user.nukes || 0) > 0) {
+    nukeInfo = `\n\n💣 Ядерных бомб: ${user.nukes}\n/mynukes — подробнее`;
+  }
+  
+  // Функция экранирования
+  const escapeMd = (text) => {
+    if (!text) return 'Unknown';
+    return String(text).replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
+  };
+  
+  await sendMessage(BOT_TOKEN, chatId,
+    `📊 *${escapeMd(username)}*\n\n` +
+    `🧼 Мыла: ${user.balance}\n` +
+    `🏚️ Своих подвалов: ${userBasements}\n` +
+    `🏚️ Захваченных подвалов: ${user.capturedBasements || 0}\n` +
+    `👶 Обычных детей: ${user.children || 0}\n` +
+    `⚔️ Мобилизовано: ${user.mobilized || 0}\n` +
+    `📌 Максимум обычных детей: ${maxChildrenPossible}\n` +
+    `📈 Доход от обычных детей: ${hourlyIncome} 🧼/час\n` +
+    `📈 Доход от захваченных подвалов: ${capturedIncome} 🧼/час${nukeInfo}\n\n` +
+    `/buybasement [количество] — купить подвалы (${config.BASEMENT_COST} 🧼/шт)\n` +
+    `/buychild [количество] — купить детей (${config.CHILD_COST} 🧼/шт)\n` +
+    `/mobilize [количество] — мобилизовать детей (${config.MOBILIZATION_COST} 🧼/шт)`);
+  return true;
+}
+
 module.exports = async (req, res) => {
   const BOT_TOKEN = process.env.BOT_TOKEN;
   
@@ -150,6 +186,8 @@ module.exports = async (req, res) => {
     // Активность
     if (!handled && await handleActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     if (!handled && await handleTopActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Баланс
+    if (!handled && await handleBalanceCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Топы
     if (!handled && await handleTopCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     if (!handled && await handleTopChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
