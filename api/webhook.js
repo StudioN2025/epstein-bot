@@ -1,40 +1,22 @@
-﻿const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, startWarmup } = require('./modules/helpers');
+const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, startWarmup } = require('./modules/helpers');
 const config = require('./modules/config');
+const { updateActivityStats } = require('./modules/activity');
+const { handleDuelCallback, handleDuelCommand } = require('./modules/duel');
 
-// Импорты команд – теперь все в одном объекте для быстрого доступа
-const commands = {
-// Админские команды из start.js
-'/addsoap': require('./modules/start').handleAdminCommand,
-'/removesoap': require('./modules/start').handleAdminCommand,
-'/addchild': require('./modules/start').handleAdminCommand,
-'/removechild': require('./modules/start').handleAdminCommand,
-'/addbasement': require('./modules/start').handleAdminCommand,
-'/removebasement': require('./modules/start').handleAdminCommand,
-'/addmobilized': require('./modules/start').handleAdminCommand,
-'/removemobilized': require('./modules/start').handleAdminCommand,
-
-// Базовые команды (добавьте, если они есть в других модулях)
-'/balance': require('./modules/start').handleBalanceCommand,      // если нет — создайте
-'/buybasement': require('./modules/children').handleBuyBasement,
-'/buychild': require('./modules/children').handleBuyChild,
-
-// Команды СВО (svo.js)
-'/mobilize': require('./modules/svo').handleMobilize,
-'/attack': require('./modules/svo').handleAttack,
-'/free': require('./modules/svo').handleFree,
-'/myarmy': require('./modules/svo').handleMyArmy,
-'/mycaptured': require('./modules/svo').handleMyCaptured,
-
-// Команды ядерного оружия (nuke.js)
-'/buynuke': require('./modules/nuke').handleBuyNuke,
-'/launchnuke': require('./modules/nuke').handleLaunchNuke,
-'/mynukes': require('./modules/nuke').handleMyNukes,
+// Импорты команд
+const { handleAdminCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand, handleStartCommand } = require('./modules/start');
+const { handleFarmCommand } = require('./modules/farm');
+const { handleChildrenCommand, handleBasementCommand, handleSendSoap, handleSendChild, handleSendBasement } = require('./modules/children');
+const { handleSvoCommand } = require('./modules/svo');
+const { handleCasinoCommand } = require('./modules/casino');
+const { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } = require('./modules/promo');
+const { handleNukeCommand } = require('./modules/nuke');
+const { handleActivityCommand, handleTopActivityCommand } = require('./modules/activity');
 
 let duels = {};
 let adminCache = {};
 let adminCacheTime = {};
 
-// Увеличенное время кэша админ-статуса (10 минут)
 const ADMIN_CACHE_TTL = 10 * 60 * 1000;
 
 async function isAdminCheck(botToken, chatId, userId) {
@@ -62,7 +44,6 @@ async function isAdminCheck(botToken, chatId, userId) {
   }
 }
 
-// Флаг для отслеживания, были ли реальные изменения данных
 let dataChanged = false;
 
 module.exports = async (req, res) => {
@@ -78,7 +59,6 @@ module.exports = async (req, res) => {
   try {
     const update = req.body;
     
-    // Обработка callback-запросов (быстро, без лишней логики)
     if (update.callback_query) {
       const cbData = update.callback_query.data;
       if (cbData.startsWith('accept_') || cbData.startsWith('aim_') || cbData.startsWith('break_') || cbData.startsWith('shoot_')) {
@@ -94,23 +74,19 @@ module.exports = async (req, res) => {
     const username = update.message.from.username || update.message.from.first_name;
     const rawText = update.message.text;
     const cleanText = cleanCommand(rawText);
-    const cmd = cleanText.split(' ')[0].toLowerCase(); // Приводим к нижнему регистру для поиска
+    const cmd = cleanText.split(' ')[0];
     
-    // Проверка чата (кроме личных сообщений админу)
     if (chatId !== config.ALLOWED_CHAT_ID && !isAdminPrivate(userId, update.message.chat.type)) {
       await sendMessage(BOT_TOKEN, chatId, `🧼 Детское мыло только на острове: ${config.GROUP_INVITE_LINK}`);
       return res.status(200).json({ ok: true });
     }
     
-    // Загружаем данные один раз
     let data = await loadData();
     if (!data.users) data.users = {};
-    dataChanged = false; // сбрасываем флаг
+    dataChanged = false;
     
-    // Обновляем статистику активности (но НЕ сохраняем сразу)
     data = await updateActivityStats(userId, username, data);
     
-    // Получаем или создаём пользователя
     let user = data.users[userId];
     if (!user) {
       user = { 
@@ -119,9 +95,8 @@ module.exports = async (req, res) => {
         nukes: 0
       };
       data.users[userId] = user;
-      dataChanged = true; // отметим, что данные изменились (новый пользователь)
+      dataChanged = true;
     } else {
-      // Убедимся, что все поля есть (миграция)
       if (user.children === undefined) { user.children = 0; dataChanged = true; }
       if (user.basements === undefined) { user.basements = 0; dataChanged = true; }
       if (user.mobilized === undefined) { user.mobilized = 0; dataChanged = true; }
@@ -130,36 +105,59 @@ module.exports = async (req, res) => {
       if (user.nukes === undefined) { user.nukes = 0; dataChanged = true; }
     }
     
-    // Проверка мута
     if (user.mutedUntil && user.mutedUntil > Math.floor(Date.now() / 1000)) {
       const remaining = user.mutedUntil - Math.floor(Date.now() / 1000);
       await sendMessage(BOT_TOKEN, chatId, `🔇 ${username}, мут ${Math.ceil(remaining / 60)} мин!`);
-      // Сохраняем только если были изменения (например, активность), но мута — не критично
       if (dataChanged) await saveData(data);
       return res.status(200).json({ ok: true });
     }
     
-    // Проверяем, нужен ли админ-статус для этой команды (список команд, требующих прав)
-    const adminRequiredCommands = ['/admin', '/createpromo', '/deletepromo', '/nuke', '/promolist'];
+    const adminRequiredCommands = ['/addsoap', '/removesoap', '/addchild', '/removechild', '/addbasement', '/removebasement', '/addmobilized', '/removemobilized', '/createpromo', '/deletepromo', '/promolist', '/removenuke'];
     let isAdmin = false;
     if (adminRequiredCommands.includes(cmd)) {
       isAdmin = await isAdminCheck(BOT_TOKEN, chatId, userId);
     }
     
-    // Ищем обработчик в словаре
-    const handler = commands[cmd];
+    // Обработка команд
     let handled = false;
-    if (handler) {
-      // Передаём isAdmin только если команда его требует; для остальных передаём false (или можно undefined)
-      const adminParam = adminRequiredCommands.includes(cmd) ? isAdmin : false;
-      handled = await handler(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, adminParam, duels);
-      // Обработчик мог изменить data или user – мы отследим изменения через dataChanged (ручное управление в обработчиках)
-      // Либо можно сделать так: после обработчика сравнить data с исходной копией. Но проще – пусть обработчики сами устанавливают dataChanged = true.
-      // Для упрощения добавим глобальную переменную dataChanged в область видимости модуля.
-    }
     
-    // Если команда не найдена или не обработана – просто ничего не делаем
-    // Сохраняем данные, если они были изменены
+    // Админ-команды
+    if (!handled && adminRequiredCommands.includes(cmd)) {
+      handled = await handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin);
+    }
+    // Промокоды
+    if (!handled && await handleCreatePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
+    if (!handled && await handlePromoList(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
+    if (!handled && await handleDeletePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
+    if (!handled && await handlePromoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Ядерка
+    if (!handled && await handleNukeCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
+    // Подвалы и дети
+    if (!handled && await handleBasementCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Переводы
+    if (!handled && await handleSendSoap(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleSendChild(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleSendBasement(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // СВО
+    if (!handled && await handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Казино
+    if (!handled && await handleCasinoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Дуэли
+    if (!handled && await handleDuelCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, duels)) handled = true;
+    // Фарм
+    if (!handled && await handleFarmCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Активность
+    if (!handled && await handleActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleTopActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Топы
+    if (!handled && await handleTopCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleTopChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleTopBasementsCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleTopMobilizedCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Старт
+    if (!handled && await handleStartCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
+    
     if (dataChanged) {
       await saveData(data);
     }
@@ -172,5 +170,4 @@ module.exports = async (req, res) => {
   }
 };
 
-// Экспортируем dataChanged, чтобы обработчики могли его устанавливать
 module.exports.setDataChanged = (value) => { dataChanged = value; };
