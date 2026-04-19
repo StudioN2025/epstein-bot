@@ -7,7 +7,6 @@ const { handleDuelCallback, handleDuelCommand } = require('./modules/duel');
 const { handleAdminCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand, handleStartCommand } = require('./modules/start');
 const { handleFarmCommand } = require('./modules/farm');
 const { handleChildrenCommand, handleBasementCommand, handleSendSoap, handleSendChild, handleSendBasement } = require('./modules/children');
-const { handleSvoCommand } = require('./modules/svo');
 const { handleCasinoCommand } = require('./modules/casino');
 const { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } = require('./modules/promo');
 const { handleNukeCommand } = require('./modules/nuke');
@@ -51,7 +50,6 @@ async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, c
   if (cleanText !== '/balance') return false;
   
   const hourlyIncome = (user.children || 0) * config.CHILD_INCOME;
-  const capturedIncome = (user.capturedBasements || 0) * config.BASEMENT_CAPTURE_REWARD;
   const userBasements = user.basements || 0;
   const maxChildrenPossible = userBasements * config.CHILDREN_PER_BASEMENT;
   
@@ -60,7 +58,6 @@ async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, c
     nukeInfo = `\n\n💣 Ядерных бомб: ${user.nukes}\n/mynukes — подробнее`;
   }
   
-  // Функция экранирования
   const escapeMd = (text) => {
     if (!text) return 'Unknown';
     return String(text).replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
@@ -69,16 +66,34 @@ async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, c
   await sendMessage(BOT_TOKEN, chatId,
     `📊 *${escapeMd(username)}*\n\n` +
     `🧼 Мыла: ${user.balance}\n` +
-    `🏚️ Своих подвалов: ${userBasements}\n` +
-    `🏚️ Захваченных подвалов: ${user.capturedBasements || 0}\n` +
-    `👶 Обычных детей: ${user.children || 0}\n` +
+    `🏚️ Подвалов: ${userBasements}\n` +
+    `👶 Детей: ${user.children || 0}\n` +
     `⚔️ Мобилизовано: ${user.mobilized || 0}\n` +
-    `📌 Максимум обычных детей: ${maxChildrenPossible}\n` +
-    `📈 Доход от обычных детей: ${hourlyIncome} 🧼/час\n` +
-    `📈 Доход от захваченных подвалов: ${capturedIncome} 🧼/час${nukeInfo}\n\n` +
+    `📌 Максимум детей: ${maxChildrenPossible}\n` +
+    `📈 Доход от детей: ${hourlyIncome} 🧼/час${nukeInfo}\n\n` +
     `/buybasement [количество] — купить подвалы (${config.BASEMENT_COST} 🧼/шт)\n` +
-    `/buychild [количество] — купить детей (${config.CHILD_COST} 🧼/шт)\n` +
-    `/mobilize [количество] — мобилизовать детей (${config.MOBILIZATION_COST} 🧼/шт)`);
+    `/buychild [количество] — купить детей (${config.CHILD_COST} 🧼/шт)`);
+  return true;
+}
+
+// Функция для /events
+async function handleEventsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+  if (cleanText !== '/events') return false;
+  
+  let reply = `📅 *ИСТОРИЯ ИВЕНТОВ* 📅\n\n`;
+  
+  if (config.EVENTS.length === 0) {
+    reply += `Пока не было ни одного ивента.`;
+  } else {
+    for (const event of config.EVENTS) {
+      reply += `🔸 *${event.name}*\n`;
+      reply += `   📆 ${event.period}\n`;
+      reply += `   📝 ${event.description}\n`;
+      reply += `   🎁 Награды: ${event.rewards}\n\n`;
+    }
+  }
+  
+  await sendMessage(BOT_TOKEN, chatId, reply);
   return true;
 }
 
@@ -175,8 +190,6 @@ module.exports = async (req, res) => {
     if (!handled && await handleSendSoap(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     if (!handled && await handleSendChild(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     if (!handled && await handleSendBasement(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    // СВО
-    if (!handled && await handleSvoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Казино
     if (!handled && await handleCasinoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Дуэли
@@ -193,6 +206,8 @@ module.exports = async (req, res) => {
     if (!handled && await handleTopChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     if (!handled && await handleTopBasementsCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     if (!handled && await handleTopMobilizedCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Ивенты
+    if (!handled && await handleEventsCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Старт
     if (!handled && await handleStartCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
     
