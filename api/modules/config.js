@@ -15,11 +15,6 @@ export const CHILD_INCOME = 1;
 export const BASEMENT_COST = 500;
 export const CHILDREN_PER_BASEMENT = 10;
 
-// Ивент СВО
-export const EVENT_END = new Date('2026-04-18T00:00:00+03:00').getTime();
-export const MOBILIZATION_COST = 50;
-export const BASEMENT_CAPTURE_REWARD = 10;
-
 // Ядерная бомба
 export const NUKE_PRICE = 15000;
 export const NUKE_ACTIVATE_DATE = new Date('2026-04-16T00:00:00+03:00').getTime();
@@ -37,6 +32,16 @@ export const INITIAL_PROMOCODES = {
   }
 };
 
+// Ивенты (история)
+export const EVENTS = [
+  {
+    name: 'СВО (Специальная Воённая Операция)',
+    period: '11 апреля 2026 - 18 апреля 2026',
+    description: 'Мобилизация детей, захват подвалов, битвы между пользователями',
+    rewards: 'Возможность захватывать подвалы и получать пассивный доход'
+  }
+];
+
 export default {
   ALLOWED_CHAT_ID,
   GROUP_INVITE_LINK,
@@ -47,11 +52,9 @@ export default {
   CHILD_INCOME,
   BASEMENT_COST,
   CHILDREN_PER_BASEMENT,
-  EVENT_END,
-  MOBILIZATION_COST,
-  BASEMENT_CAPTURE_REWARD,
   NUKE_PRICE,
   NUKE_ACTIVATE_DATE,
   ADMIN_USER_ID,
-  INITIAL_PROMOCODES
+  INITIAL_PROMOCODES,
+  EVENTS
 };
