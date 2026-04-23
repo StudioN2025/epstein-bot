@@ -4,7 +4,7 @@ const { updateActivityStats } = require('./modules/activity');
 const { handleDuelCallback, handleDuelCommand } = require('./modules/duel');
 
 // Импорты команд
-const { handleAdminCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleTopMobilizedCommand, handleStartCommand } = require('./modules/start');
+const { handleAdminCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleStartCommand } = require('./modules/start');
 const { handleFarmCommand } = require('./modules/farm');
 const { handleChildrenCommand, handleBasementCommand, handleSendSoap, handleSendChild, handleSendBasement } = require('./modules/children');
 const { handleCasinoCommand } = require('./modules/casino');
@@ -210,7 +210,6 @@ module.exports = async (req, res) => {
     if (!handled && await handleTopCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     if (!handled && await handleTopChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     if (!handled && await handleTopBasementsCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleTopMobilizedCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Ивенты
     if (!handled && await handleEventsCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Магазин
