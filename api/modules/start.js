@@ -189,68 +189,6 @@ async function handleRemoveBasement(parts, user, data, BOT_TOKEN, chatId, userna
   return true;
 }
 
-async function handleAddMobilized(parts, user, data, BOT_TOKEN, chatId, username) {
-  if (parts.length < 3) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ /addmobilized @username 2`);
-    return true;
-  }
-  let targetUsername = parts[1].replace('@', '');
-  const amount = parseInt(parts[2]);
-  if (isNaN(amount) || amount <= 0) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
-    return true;
-  }
-  let targetId = null;
-  for (const [id, u] of Object.entries(data.users)) {
-    if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
-      targetId = parseInt(id);
-      break;
-    }
-  }
-  if (!targetId) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
-    return true;
-  }
-  let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0, mobilized: 0 };
-  targetUser.mobilized = (targetUser.mobilized || 0) + amount;
-  targetUser.username = targetUsername;
-  data.users[targetId] = targetUser;
-  await saveData(data);
-  await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} добавил ${amount} ⚔️ @${targetUsername}\n📊 Теперь: ${targetUser.mobilized} ⚔️`);
-  return true;
-}
-
-async function handleRemoveMobilized(parts, user, data, BOT_TOKEN, chatId, username) {
-  if (parts.length < 3) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ /removemobilized @username 2`);
-    return true;
-  }
-  let targetUsername = parts[1].replace('@', '');
-  const amount = parseInt(parts[2]);
-  if (isNaN(amount) || amount <= 0) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
-    return true;
-  }
-  let targetId = null;
-  for (const [id, u] of Object.entries(data.users)) {
-    if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
-      targetId = parseInt(id);
-      break;
-    }
-  }
-  if (!targetId) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
-    return true;
-  }
-  let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0, mobilized: 0 };
-  targetUser.mobilized = Math.max(0, (targetUser.mobilized || 0) - amount);
-  targetUser.username = targetUsername;
-  data.users[targetId] = targetUser;
-  await saveData(data);
-  await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} снял ${amount} ⚔️ у @${targetUsername}\n📊 Теперь: ${targetUser.mobilized} ⚔️`);
-  return true;
-}
-
 // ========== ТОПЫ ==========
 
 async function handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
@@ -267,7 +205,7 @@ async function handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
   let reply = '🏆 *ТОП МЫЛА НА ОСТРОВЕ* 🏆\n\n';
   for (let i = 0; i < sorted.length; i++) {
     const u = sorted[i];
-    reply += `${i+1}. ${escapeMarkdown(u.username)} — ${u.balance || 0} 🧼 (👶 ${u.children || 0}, ⚔️ ${u.mobilized || 0}, 🏚️ ${u.basements || 0})\n`;
+    reply += `${i+1}. ${escapeMarkdown(u.username)} — ${u.balance || 0} 🧼 (👶 ${u.children || 0}, 🏚️ ${u.basements || 0})\n`;
   }
   await sendMessage(BOT_TOKEN, chatId, reply);
   return true;
@@ -288,7 +226,7 @@ async function handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKE
   for (let i = 0; i < sorted.length; i++) {
     const u = sorted[i];
     if (u.children > 0) {
-      reply += `${i+1}. ${escapeMarkdown(u.username)} — ${u.children} 👶 (⚔️ ${u.mobilized || 0}, 🏚️ ${u.basements || 0})\n`;
+      reply += `${i+1}. ${escapeMarkdown(u.username)} — ${u.children} 👶 (🏚️ ${u.basements || 0})\n`;
     }
   }
   await sendMessage(BOT_TOKEN, chatId, reply);
@@ -317,28 +255,6 @@ async function handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOK
   return true;
 }
 
-async function handleTopMobilizedCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
-  if (cleanText !== '/topmobilized') return false;
-  
-  const users = Object.values(data.users);
-  const sorted = users.sort((a, b) => (b.mobilized || 0) - (a.mobilized || 0)).slice(0, 10);
-  
-  if (!sorted.length || sorted[0].mobilized === 0) {
-    await sendMessage(BOT_TOKEN, chatId, '⚔️ Топ мобилизованных пуст!');
-    return true;
-  }
-  
-  let reply = '⚔️ *ТОП МОБИЛИЗОВАННЫХ* ⚔️\n\n';
-  for (let i = 0; i < sorted.length; i++) {
-    const u = sorted[i];
-    if (u.mobilized > 0) {
-      reply += `${i+1}. ${escapeMarkdown(u.username)} — ⚔️ ${u.mobilized} (👶 ${u.children || 0})\n`;
-    }
-  }
-  await sendMessage(BOT_TOKEN, chatId, reply);
-  return true;
-}
-
 // ========== СТАРТОВАЯ КОМАНДА ==========
 
 async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin) {
@@ -348,39 +264,44 @@ async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, cha
   if (isAdmin) {
     adminCommands = `\n\n👑 *АДМИН-КОМАНДЫ:*\n` +
       `/addsoap @user 50\n/removesoap @user 50\n/addchild @user 2\n/removechild @user 2\n` +
-      `/addbasement @user 2\n/removebasement @user 2\n/addmobilized @user 2\n/removemobilized @user 2\n` +
-      `/createpromo КОД 100 10\n/deletepromo КОД\n/promolist\n/removenuke @user\n`;
-  }
-  
-  let nukeCommands = '';
-  if (Date.now() >= config.NUKE_ACTIVATE_DATE) {
-    nukeCommands = `\n\n💣 *СЕКРЕТНОЕ ОРУЖИЕ:*\n` +
-      `/buynuke — купить бомбу (${config.NUKE_PRICE} 🧼)\n/launchnuke @user — запустить бомбу\n/mynukes — мои бомбы\n`;
+      `/addbasement @user 2\n/removebasement @user 2\n` +
+      `/createpromo КОД 100 10\n/deletepromo КОД\n/promolist\n`;
   }
   
   await sendMessage(BOT_TOKEN, chatId,
     `🧼 *ОСТРОВ ЭПШТЕЙНА* 🏝️\n\nПривет, ${escapeMarkdown(username)}!\n\n` +
     `🎯 *КОМАНДЫ:*\n` +
     `/farm — фарм мыла (1-30, раз в час)\n` +
-    `/balance — баланс\n/top — топ по мылу\n/topchildren — топ по детям\n` +
-    `/topbasements — топ по подвалам\n/topmobilized — топ по мобилизованным\n` +
-    `/children — мои дети\n/basements — мои подвалы\n` +
+    `/balance — баланс\n` +
+    `/top — топ по мылу\n` +
+    `/topchildren — топ по детям\n` +
+    `/topbasements — топ по подвалам\n` +
+    `/children — мои дети\n` +
+    `/basements — мои подвалы\n` +
     `/buybasement [количество] — купить подвалы (${config.BASEMENT_COST} 🧼/шт)\n` +
     `/buychild [количество] — купить детей (${config.CHILD_COST} 🧼/шт)\n` +
-    `/shop — публичный магазин\n` +
+    `/sellbasement [количество] — продать подвалы\n` +
+    `/sellchild [количество] — продать детей\n` +
+    `/sendsoap @user 50 — перевести мыло\n` +
+    `/sendchild @user 2 — перевести детей\n` +
+    `/sendbasement @user 2 — перевести подвалы\n` +
+    `/duel @user [ставка] — дуэль\n` +
+    `/casino [ставка] [число] — казино (x2 при победе)\n` +
+    `/promo — ввести промокод\n` +
+    `/activity — моя статистика\n` +
+    `/topactivity [hour/day/week] — топ активности\n` +
+    `/events — история ивентов\n\n` +
+    `🛒 *МАГАЗИН:*\n` +
+    `/shop — посмотреть магазин\n` +
     `/sell [тип] [кол-во] [цена] — выставить товар\n` +
     `/buy [ID] — купить товар\n` +
-    `/sellbasement [количество] — продать подвалы обратно\n` +
-    `/sellchild [количество] — продать детей обратно\n` +
-    `/sendsoap @user 50 — перевести мыло\n/sendchild @user 2 — перевести детей\n/sendbasement @user 2 — перевести подвалы\n` +
-    `/duel @user [ставка] — дуэль\n/casino [ставка] [число] — казино (x2 при победе)\n` +
-    `/promo — ввести промокод\n/activity — моя статистика\n/topactivity [hour/day/week] — топ активности\n\n` +
-    `⚔️ *ИВЕНТ СВО (до 18.04.2026):*\n` +
-    `/svo — информация\n/mobilize [количество] — мобилизовать детей (${config.MOBILIZATION_COST} 🧼/шт)\n` +
-    `/attack @user [количество] — атаковать\n/free @user — освободить подвалы\n/myarmy — моя армия\n/mycaptured — захваченные подвалы` +
-    nukeCommands + adminCommands +
-    `\n\n📈 Дети приносят ${config.CHILD_INCOME} 🧼/час\n⚠️ Пидиди крадет мыло (5%)\n` +
-    `👶 1 ребенок = ${config.CHILD_COST} мыла\n🏚️ 1 подвал = ${config.BASEMENT_COST} мыла\n🔑 1 подвал = ${config.CHILDREN_PER_BASEMENT} детей`);
+    `/remove [ID] — снять объявление\n` +
+    adminCommands +
+    `\n\n📈 Дети приносят ${config.CHILD_INCOME} 🧼 в час!\n` +
+    `⚠️ Пидиди крадет мыло (5%)\n` +
+    `👶 1 ребенок = ${config.CHILD_COST} мыла\n` +
+    `🏚️ 1 подвал = ${config.BASEMENT_COST} мыла\n` +
+    `🔑 1 подвал = ${config.CHILDREN_PER_BASEMENT} детей`);
   return true;
 }
 
@@ -398,8 +319,6 @@ async function handleAdminCommand(cleanText, rawText, user, data, BOT_TOKEN, cha
   if (cmd === '/removechild') return await handleRemoveChild(parts, user, data, BOT_TOKEN, chatId, username);
   if (cmd === '/addbasement') return await handleAddBasement(parts, user, data, BOT_TOKEN, chatId, username);
   if (cmd === '/removebasement') return await handleRemoveBasement(parts, user, data, BOT_TOKEN, chatId, username);
-  if (cmd === '/addmobilized') return await handleAddMobilized(parts, user, data, BOT_TOKEN, chatId, username);
-  if (cmd === '/removemobilized') return await handleRemoveMobilized(parts, user, data, BOT_TOKEN, chatId, username);
   
   return false;
 }
@@ -409,6 +328,5 @@ module.exports = {
   handleAdminCommand,
   handleTopCommand,
   handleTopChildrenCommand,
-  handleTopBasementsCommand,
-  handleTopMobilizedCommand
+  handleTopBasementsCommand
 };
