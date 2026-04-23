@@ -9,8 +9,15 @@ const { handleFarmCommand } = require('./modules/farm');
 const { handleChildrenCommand, handleBasementCommand, handleSendSoap, handleSendChild, handleSendBasement } = require('./modules/children');
 const { handleCasinoCommand } = require('./modules/casino');
 const { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } = require('./modules/promo');
-const { handleNukeCommand } = require('./modules/nuke');
 const { handleActivityCommand, handleTopActivityCommand } = require('./modules/activity');
+const { 
+  handleCreateListing, 
+  handleBuyListing, 
+  handleRemoveListing, 
+  handleShopCommand,
+  handleSellBasementToBank,
+  handleSellChildToBank
+} = require('./modules/shop');
 
 let duels = {};
 let adminCache = {};
@@ -53,11 +60,6 @@ async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, c
   const userBasements = user.basements || 0;
   const maxChildrenPossible = userBasements * config.CHILDREN_PER_BASEMENT;
   
-  let nukeInfo = '';
-  if (Date.now() >= config.NUKE_ACTIVATE_DATE && (user.nukes || 0) > 0) {
-    nukeInfo = `\n\n💣 Ядерных бомб: ${user.nukes}\n/mynukes — подробнее`;
-  }
-  
   const escapeMd = (text) => {
     if (!text) return 'Unknown';
     return String(text).replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
@@ -70,9 +72,11 @@ async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, c
     `👶 Детей: ${user.children || 0}\n` +
     `⚔️ Мобилизовано: ${user.mobilized || 0}\n` +
     `📌 Максимум детей: ${maxChildrenPossible}\n` +
-    `📈 Доход от детей: ${hourlyIncome} 🧼/час${nukeInfo}\n\n` +
+    `📈 Доход от детей: ${hourlyIncome} 🧼/час\n\n` +
     `/buybasement [количество] — купить подвалы (${config.BASEMENT_COST} 🧼/шт)\n` +
-    `/buychild [количество] — купить детей (${config.CHILD_COST} 🧼/шт)`);
+    `/buychild [количество] — купить детей (${config.CHILD_COST} 🧼/шт)\n` +
+    `/sellbasement [количество] — продать подвалы\n` +
+    `/sellchild [количество] — продать детей`);
   return true;
 }
 
@@ -142,8 +146,7 @@ module.exports = async (req, res) => {
     if (!user) {
       user = { 
         balance: 0, children: 0, basements: 0, username, lastFarm: 0, mutedUntil: 0, lastChildIncome: Date.now(),
-        mobilized: 0, capturedBasements: 0, capturedBasementsDetails: [], lastCapturedIncome: Date.now(),
-        nukes: 0
+        mobilized: 0, capturedBasements: 0, capturedBasementsDetails: [], lastCapturedIncome: Date.now()
       };
       data.users[userId] = user;
       dataChanged = true;
@@ -153,7 +156,6 @@ module.exports = async (req, res) => {
       if (user.mobilized === undefined) { user.mobilized = 0; dataChanged = true; }
       if (user.capturedBasements === undefined) { user.capturedBasements = 0; dataChanged = true; }
       if (!user.capturedBasementsDetails) { user.capturedBasementsDetails = []; dataChanged = true; }
-      if (user.nukes === undefined) { user.nukes = 0; dataChanged = true; }
     }
     
     if (user.mutedUntil && user.mutedUntil > Math.floor(Date.now() / 1000)) {
@@ -163,7 +165,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: true });
     }
     
-    const adminRequiredCommands = ['/addsoap', '/removesoap', '/addchild', '/removechild', '/addbasement', '/removebasement', '/addmobilized', '/removemobilized', '/createpromo', '/deletepromo', '/promolist', '/removenuke'];
+    const adminRequiredCommands = ['/addsoap', '/removesoap', '/addchild', '/removechild', '/addbasement', '/removebasement', '/addmobilized', '/removemobilized', '/createpromo', '/deletepromo', '/promolist'];
     let isAdmin = false;
     if (adminRequiredCommands.includes(cmd)) {
       isAdmin = await isAdminCheck(BOT_TOKEN, chatId, userId);
@@ -181,8 +183,6 @@ module.exports = async (req, res) => {
     if (!handled && await handlePromoList(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
     if (!handled && await handleDeletePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
     if (!handled && await handlePromoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    // Ядерка
-    if (!handled && await handleNukeCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
     // Подвалы и дети
     if (!handled && await handleBasementCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     if (!handled && await handleChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
@@ -208,6 +208,14 @@ module.exports = async (req, res) => {
     if (!handled && await handleTopMobilizedCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Ивенты
     if (!handled && await handleEventsCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Магазин
+    if (!handled && await handleCreateListing(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleBuyListing(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleRemoveListing(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleShopCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Продажа в банк
+    if (!handled && await handleSellBasementToBank(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleSellChildToBank(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Старт
     if (!handled && await handleStartCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
     
