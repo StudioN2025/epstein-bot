@@ -1,4 +1,4 @@
-const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, startWarmup } = require('./modules/helpers');
+const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, escapeMarkdown } = require('./modules/helpers');
 const config = require('./modules/config');
 const { updateActivityStats } = require('./modules/activity');
 const { handleDuelCallback, handleDuelCommand } = require('./modules/duel');
@@ -23,16 +23,19 @@ let duels = {};
 let adminCache = {};
 let adminCacheTime = {};
 
-const ADMIN_CACHE_TTL = 10 * 60 * 1000;
+const ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 минут
 
 async function isAdminCheck(botToken, chatId, userId) {
   if (userId === config.ADMIN_USER_ID) return true;
+  
   const cacheKey = `${chatId}_${userId}`;
   const now = Date.now();
   if (adminCache[cacheKey] && (now - adminCacheTime[cacheKey]) < ADMIN_CACHE_TTL) {
     return adminCache[cacheKey];
   }
+  
   if (chatId !== config.ALLOWED_CHAT_ID) return false;
+  
   try {
     const url = `https://api.telegram.org/bot${botToken}/getChatMember`;
     const response = await fetch(url, {
@@ -60,13 +63,8 @@ async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, c
   const userBasements = user.basements || 0;
   const maxChildrenPossible = userBasements * config.CHILDREN_PER_BASEMENT;
   
-  const escapeMd = (text) => {
-    if (!text) return 'Unknown';
-    return String(text).replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
-  };
-  
   await sendMessage(BOT_TOKEN, chatId,
-    `📊 *${escapeMd(username)}*\n\n` +
+    `📊 *${escapeMarkdown(username)}*\n\n` +
     `🧼 Мыла: ${user.balance}\n` +
     `🏚️ Подвалов: ${userBasements}\n` +
     `👶 Детей: ${user.children || 0}\n` +
@@ -105,7 +103,6 @@ module.exports = async (req, res) => {
   const BOT_TOKEN = process.env.BOT_TOKEN;
   
   if (req.method === 'GET') {
-    startWarmup(BOT_TOKEN);
     return res.status(200).json({ ok: true, message: 'Epstain Bot 🧼', time: Date.now() });
   }
   
@@ -114,6 +111,7 @@ module.exports = async (req, res) => {
   try {
     const update = req.body;
     
+    // Обработка callback кнопок
     if (update.callback_query) {
       const cbData = update.callback_query.data;
       if (cbData.startsWith('accept_') || cbData.startsWith('aim_') || cbData.startsWith('break_') || cbData.startsWith('shoot_')) {
@@ -131,17 +129,21 @@ module.exports = async (req, res) => {
     const cleanText = cleanCommand(rawText);
     const cmd = cleanText.split(' ')[0];
     
+    // Проверка доступа
     if (chatId !== config.ALLOWED_CHAT_ID && !isAdminPrivate(userId, update.message.chat.type)) {
       await sendMessage(BOT_TOKEN, chatId, `🧼 Детское мыло только на острове: ${config.GROUP_INVITE_LINK}`);
       return res.status(200).json({ ok: true });
     }
     
+    // Загрузка данных
     let data = await loadData();
     if (!data.users) data.users = {};
     dataChanged = false;
     
+    // Обновление активности
     data = await updateActivityStats(userId, username, data);
     
+    // Создание пользователя
     let user = data.users[userId];
     if (!user) {
       user = { 
@@ -151,6 +153,7 @@ module.exports = async (req, res) => {
       data.users[userId] = user;
       dataChanged = true;
     } else {
+      // Инициализация полей
       if (user.children === undefined) { user.children = 0; dataChanged = true; }
       if (user.basements === undefined) { user.basements = 0; dataChanged = true; }
       if (user.mobilized === undefined) { user.mobilized = 0; dataChanged = true; }
@@ -158,6 +161,7 @@ module.exports = async (req, res) => {
       if (!user.capturedBasementsDetails) { user.capturedBasementsDetails = []; dataChanged = true; }
     }
     
+    // Проверка мута
     if (user.mutedUntil && user.mutedUntil > Math.floor(Date.now() / 1000)) {
       const remaining = user.mutedUntil - Math.floor(Date.now() / 1000);
       await sendMessage(BOT_TOKEN, chatId, `🔇 ${username}, мут ${Math.ceil(remaining / 60)} мин!`);
@@ -165,9 +169,10 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: true });
     }
     
-    const adminRequiredCommands = ['/addsoap', '/removesoap', '/addchild', '/removechild', '/addbasement', '/removebasement', '/addmobilized', '/removemobilized', '/createpromo', '/deletepromo', '/promolist'];
+    // Проверка админа
+    const adminCommands = ['/addsoap', '/removesoap', '/addchild', '/removechild', '/addbasement', '/removebasement', '/addmobilized', '/removemobilized', '/createpromo', '/deletepromo', '/promolist'];
     let isAdmin = false;
-    if (adminRequiredCommands.includes(cmd)) {
+    if (adminCommands.includes(cmd)) {
       isAdmin = await isAdminCheck(BOT_TOKEN, chatId, userId);
     }
     
@@ -175,7 +180,7 @@ module.exports = async (req, res) => {
     let handled = false;
     
     // Админ-команды
-    if (!handled && adminRequiredCommands.includes(cmd)) {
+    if (!handled && adminCommands.includes(cmd)) {
       handled = await handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin);
     }
     // Промокоды
@@ -219,6 +224,7 @@ module.exports = async (req, res) => {
     // Старт
     if (!handled && await handleStartCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
     
+    // Сохранение изменений
     if (dataChanged) {
       await saveData(data);
     }
