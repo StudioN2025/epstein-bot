@@ -367,6 +367,11 @@ async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, cha
     `/children — мои дети\n/basements — мои подвалы\n` +
     `/buybasement [количество] — купить подвалы (${config.BASEMENT_COST} 🧼/шт)\n` +
     `/buychild [количество] — купить детей (${config.CHILD_COST} 🧼/шт)\n` +
+    `/shop — публичный магазин\n` +
+    `/sell [тип] [кол-во] [цена] — выставить товар\n` +
+    `/buy [ID] — купить товар\n` +
+    `/sellbasement [количество] — продать подвалы обратно\n` +
+    `/sellchild [количество] — продать детей обратно\n` +
     `/sendsoap @user 50 — перевести мыло\n/sendchild @user 2 — перевести детей\n/sendbasement @user 2 — перевести подвалы\n` +
     `/duel @user [ставка] — дуэль\n/casino [ставка] [число] — казино (x2 при победе)\n` +
     `/promo — ввести промокод\n/activity — моя статистика\n/topactivity [hour/day/week] — топ активности\n\n` +
