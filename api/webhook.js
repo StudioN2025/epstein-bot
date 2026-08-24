@@ -3,8 +3,16 @@ const config = require('./config');
 const { updateActivityStats } = require('./activity');
 const { handleDuelCallback, handleDuelCommand } = require('./duel');
 
-// Импорты команд
-const { handleAdminCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleStartCommand, handleRankCommand } = require('./start');
+// Импорты команд - все из папки modules (текущая директория)
+const { 
+  handleAdminCommand, 
+  handleTopCommand, 
+  handleTopChildrenCommand, 
+  handleTopBasementsCommand, 
+  handleStartCommand, 
+  handleRankCommand 
+} = require('./start');
+
 const { handleFarmCommand } = require('./farm');
 const { handleChildrenCommand, handleBasementCommand, handleSendSoap, handleSendChild, handleSendBasement } = require('./children');
 const { handleCasinoCommand } = require('./casino');
