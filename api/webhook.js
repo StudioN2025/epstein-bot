@@ -1,15 +1,15 @@
-const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, escapeMarkdown } = require('./modules/helpers');
-const config = require('./modules/config');
-const { updateActivityStats } = require('./modules/activity');
-const { handleDuelCallback, handleDuelCommand } = require('./modules/duel');
+const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, escapeMarkdown } = require('./helpers');
+const config = require('./config');
+const { updateActivityStats } = require('./activity');
+const { handleDuelCallback, handleDuelCommand } = require('./duel');
 
 // Импорты команд
-const { handleAdminCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleStartCommand, handleRankCommand } = require('./modules/start');
-const { handleFarmCommand } = require('./modules/farm');
-const { handleChildrenCommand, handleBasementCommand, handleSendSoap, handleSendChild, handleSendBasement } = require('./modules/children');
-const { handleCasinoCommand } = require('./modules/casino');
-const { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } = require('./modules/promo');
-const { handleActivityCommand, handleTopActivityCommand } = require('./modules/activity');
+const { handleAdminCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleStartCommand, handleRankCommand } = require('./start');
+const { handleFarmCommand } = require('./farm');
+const { handleChildrenCommand, handleBasementCommand, handleSendSoap, handleSendChild, handleSendBasement } = require('./children');
+const { handleCasinoCommand } = require('./casino');
+const { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } = require('./promo');
+const { handleActivityCommand, handleTopActivityCommand } = require('./activity');
 const { 
   handleCreateListing, 
   handleBuyListing, 
@@ -17,7 +17,7 @@ const {
   handleShopCommand,
   handleSellBasementToBank,
   handleSellChildToBank
-} = require('./modules/shop');
+} = require('./shop');
 
 let duels = {};
 let adminCache = {};
@@ -183,7 +183,7 @@ module.exports = async (req, res) => {
     if (!handled && adminCommands.includes(cmd)) {
       handled = await handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin);
     }
-    // Промокоды - передаем cleanText целиком, а не cmd
+    // Промокоды
     if (!handled && await handleCreatePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
     if (!handled && await handlePromoList(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
     if (!handled && await handleDeletePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
