@@ -261,12 +261,11 @@ async function handleRankCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
   if (cleanText !== '/rank' && !cleanText.startsWith('/rank ')) return false;
   
   const parts = rawText.split(' ');
-  let targetUsername = null;
   let targetId = userId;
   
   // Если указан @username
   if (parts.length >= 2) {
-    targetUsername = parts[1].replace('@', '');
+    const targetUsername = parts[1].replace('@', '');
     let found = false;
     for (const [id, u] of Object.entries(data.users)) {
       if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
@@ -364,14 +363,13 @@ async function handleRankCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
   }
   
   // Формируем ответ
+  const totalPoints = (targetUser.balance || 0) + (targetUser.children || 0) * 100 + (targetUser.basements || 0) * 500;
+  
   let reply = `${rankEmoji} *РЕЙТИНГ ИГРОКА* ${rankEmoji}\n\n`;
   reply += `👤 ${escapeMarkdown(targetName)}\n`;
   reply += `🏆 Ранг: #${rank} из ${totalUsers}\n`;
   reply += `📊 Процентиль: ${percentile}%\n`;
   reply += `${rankEmoji} Статус: ${rankTitle}\n\n`;
-  
-  // Показываем статистику
-  const totalPoints = (targetUser.balance || 0) + (targetUser.children || 0) * 100 + (targetUser.basements || 0) * 500;
   reply += `📊 *СТАТИСТИКА:*\n`;
   reply += `🧼 Мыло: ${targetUser.balance || 0}\n`;
   reply += `👶 Дети: ${targetUser.children || 0} (${(targetUser.children || 0) * 100} очков)\n`;
@@ -386,7 +384,7 @@ async function handleRankCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
     reply += `${prefix}#${n.rank} ${emoji} ${escapeMarkdown(n.username)} — ${n.total} очков${n.isTarget ? ' ⬅️ ВЫ' : ''}\n`;
   }
   
-  if (rank > 3) {
+  if (rank > 3 && allUsers.length > 0) {
     const top1 = allUsers[0];
     reply += `\n👑 Лидер: ${escapeMarkdown(top1.username)} — ${top1.total} очков`;
     
