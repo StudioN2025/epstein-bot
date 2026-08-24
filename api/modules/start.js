@@ -255,6 +255,153 @@ async function handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOK
   return true;
 }
 
+// ========== РЕЙТИНГ / RANK ==========
+
+async function handleRankCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+  if (cleanText !== '/rank' && !cleanText.startsWith('/rank ')) return false;
+  
+  const parts = rawText.split(' ');
+  let targetUsername = null;
+  let targetId = userId;
+  
+  // Если указан @username
+  if (parts.length >= 2) {
+    targetUsername = parts[1].replace('@', '');
+    let found = false;
+    for (const [id, u] of Object.entries(data.users)) {
+      if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+        targetId = parseInt(id);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+      return true;
+    }
+  }
+  
+  const targetUser = data.users[targetId];
+  if (!targetUser) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ Пользователь не найден в базе!`);
+    return true;
+  }
+  
+  const targetName = targetUser.username || 'Unknown';
+  
+  // Получаем ранги всех пользователей
+  const allUsers = Object.entries(data.users).map(([id, u]) => ({
+    id: parseInt(id),
+    username: u.username || 'Unknown',
+    balance: u.balance || 0,
+    children: u.children || 0,
+    basements: u.basements || 0,
+    total: (u.balance || 0) + (u.children || 0) * 100 + (u.basements || 0) * 500
+  }));
+  
+  // Сортируем по total (богатству)
+  allUsers.sort((a, b) => b.total - a.total);
+  
+  // Находим позицию пользователя
+  let rank = 1;
+  let foundRank = false;
+  for (let i = 0; i < allUsers.length; i++) {
+    if (allUsers[i].id === targetId) {
+      rank = i + 1;
+      foundRank = true;
+      break;
+    }
+  }
+  
+  if (!foundRank) {
+    await sendMessage(BOT_TOKEN, chatId, `❌ ${targetName} не в рейтинге!`);
+    return true;
+  }
+  
+  const totalUsers = allUsers.length;
+  const percentile = ((totalUsers - rank) / totalUsers * 100).toFixed(1);
+  
+  // Получаем соседей (2 выше, 2 ниже)
+  const neighbors = [];
+  const startIdx = Math.max(0, rank - 3);
+  const endIdx = Math.min(allUsers.length, rank + 2);
+  
+  for (let i = startIdx; i < endIdx; i++) {
+    const u = allUsers[i];
+    neighbors.push({
+      rank: i + 1,
+      username: u.username,
+      total: u.total,
+      isTarget: u.id === targetId
+    });
+  }
+  
+  // Определяем эмодзи для ранга
+  let rankEmoji = '📊';
+  let rankTitle = '';
+  
+  if (rank === 1) {
+    rankEmoji = '👑';
+    rankTitle = 'КОРОЛЬ ОСТРОВА!';
+  } else if (rank === 2) {
+    rankEmoji = '🥈';
+    rankTitle = 'ВИЦЕ-КОРОЛЬ';
+  } else if (rank === 3) {
+    rankEmoji = '🥉';
+    rankTitle = 'ТОП-3';
+  } else if (rank <= 10) {
+    rankEmoji = '⭐';
+    rankTitle = 'ТОП-10';
+  } else if (rank <= 50) {
+    rankEmoji = '🌟';
+    rankTitle = 'ЭЛИТА ОСТРОВА';
+  } else if (rank <= 100) {
+    rankEmoji = '💪';
+    rankTitle = 'СИЛЬНЫЙ ИГРОК';
+  } else {
+    rankEmoji = '🧼';
+    rankTitle = 'РАБОЧАЯ ПЧЕЛКА';
+  }
+  
+  // Формируем ответ
+  let reply = `${rankEmoji} *РЕЙТИНГ ИГРОКА* ${rankEmoji}\n\n`;
+  reply += `👤 ${escapeMarkdown(targetName)}\n`;
+  reply += `🏆 Ранг: #${rank} из ${totalUsers}\n`;
+  reply += `📊 Процентиль: ${percentile}%\n`;
+  reply += `${rankEmoji} Статус: ${rankTitle}\n\n`;
+  
+  // Показываем статистику
+  const totalPoints = (targetUser.balance || 0) + (targetUser.children || 0) * 100 + (targetUser.basements || 0) * 500;
+  reply += `📊 *СТАТИСТИКА:*\n`;
+  reply += `🧼 Мыло: ${targetUser.balance || 0}\n`;
+  reply += `👶 Дети: ${targetUser.children || 0} (${(targetUser.children || 0) * 100} очков)\n`;
+  reply += `🏚️ Подвалы: ${targetUser.basements || 0} (${(targetUser.basements || 0) * 500} очков)\n`;
+  reply += `💰 Всего очков: ${totalPoints}\n\n`;
+  
+  // Показываем соседей
+  reply += `📋 *СОСЕДИ В РЕЙТИНГЕ:*\n`;
+  for (const n of neighbors) {
+    const prefix = n.isTarget ? '👉 ' : '   ';
+    const emoji = n.rank === 1 ? '👑' : n.rank === 2 ? '🥈' : n.rank === 3 ? '🥉' : '•';
+    reply += `${prefix}#${n.rank} ${emoji} ${escapeMarkdown(n.username)} — ${n.total} очков${n.isTarget ? ' ⬅️ ВЫ' : ''}\n`;
+  }
+  
+  if (rank > 3) {
+    const top1 = allUsers[0];
+    reply += `\n👑 Лидер: ${escapeMarkdown(top1.username)} — ${top1.total} очков`;
+    
+    const diff = top1.total - totalPoints;
+    if (diff > 0 && rank > 1) {
+      reply += `\n📈 До лидера: ${diff} очков`;
+    }
+  }
+  
+  reply += `\n\n/rank @username — посмотреть ранг другого игрока`;
+  
+  await sendMessage(BOT_TOKEN, chatId, reply);
+  return true;
+}
+
 // ========== СТАРТОВАЯ КОМАНДА ==========
 
 async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin) {
@@ -276,6 +423,8 @@ async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, cha
     `/top — топ по мылу\n` +
     `/topchildren — топ по детям\n` +
     `/topbasements — топ по подвалам\n` +
+    `/rank — мой рейтинг\n` +
+    `/rank @user — рейтинг игрока\n` +
     `/children — мои дети\n` +
     `/basements — мои подвалы\n` +
     `/buybasement [количество] — купить подвалы (${config.BASEMENT_COST} 🧼/шт)\n` +
@@ -305,28 +454,11 @@ async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, cha
   return true;
 }
 
-// ========== ГЛАВНАЯ ФУНКЦИЯ ДЛЯ ОБРАБОТКИ АДМИН-КОМАНД ==========
-
-async function handleAdminCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin) {
-  if (!isAdmin) return false;
-  
-  const parts = rawText.split(' ');
-  const cmd = cleanText;
-  
-  if (cmd === '/addsoap') return await handleAddSoap(parts, user, data, BOT_TOKEN, chatId, username);
-  if (cmd === '/removesoap') return await handleRemoveSoap(parts, user, data, BOT_TOKEN, chatId, username);
-  if (cmd === '/addchild') return await handleAddChild(parts, user, data, BOT_TOKEN, chatId, username);
-  if (cmd === '/removechild') return await handleRemoveChild(parts, user, data, BOT_TOKEN, chatId, username);
-  if (cmd === '/addbasement') return await handleAddBasement(parts, user, data, BOT_TOKEN, chatId, username);
-  if (cmd === '/removebasement') return await handleRemoveBasement(parts, user, data, BOT_TOKEN, chatId, username);
-  
-  return false;
-}
-
 module.exports = { 
   handleStartCommand,
   handleAdminCommand,
   handleTopCommand,
   handleTopChildrenCommand,
-  handleTopBasementsCommand
+  handleTopBasementsCommand,
+  handleRankCommand
 };
