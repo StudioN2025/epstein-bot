@@ -3,7 +3,7 @@ const config = require('./config');
 const { updateActivityStats } = require('./activity');
 const { handleDuelCallback, handleDuelCommand } = require('./duel');
 
-// Импорты команд - все из папки modules (текущая директория)
+// Импорты команд
 const { 
   handleAdminCommand, 
   handleTopCommand, 
