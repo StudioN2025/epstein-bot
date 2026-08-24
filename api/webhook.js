@@ -183,45 +183,45 @@ module.exports = async (req, res) => {
     if (!handled && adminCommands.includes(cmd)) {
       handled = await handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin);
     }
-    // Промокоды
-    if (!handled && await handleCreatePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
-    if (!handled && await handlePromoList(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
-    if (!handled && await handleDeletePromo(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
-    if (!handled && await handlePromoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Промокоды - передаем cleanText целиком, а не cmd
+    if (!handled && await handleCreatePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
+    if (!handled && await handlePromoList(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
+    if (!handled && await handleDeletePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
+    if (!handled && await handlePromoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Подвалы и дети
-    if (!handled && await handleBasementCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Переводы
-    if (!handled && await handleSendSoap(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleSendChild(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleSendBasement(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleSendSoap(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleSendChild(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleSendBasement(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Казино
-    if (!handled && await handleCasinoCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleCasinoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Дуэли
-    if (!handled && await handleDuelCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, duels)) handled = true;
+    if (!handled && await handleDuelCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, duels)) handled = true;
     // Фарм
-    if (!handled && await handleFarmCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleFarmCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Активность
-    if (!handled && await handleActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleTopActivityCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleActivityCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleTopActivityCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Баланс
-    if (!handled && await handleBalanceCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Топы
-    if (!handled && await handleTopCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleTopChildrenCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleTopBasementsCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Ивенты
-    if (!handled && await handleEventsCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleEventsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Магазин
-    if (!handled && await handleCreateListing(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleBuyListing(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleRemoveListing(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleShopCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleCreateListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleBuyListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleRemoveListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleShopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Продажа в банк
-    if (!handled && await handleSellBasementToBank(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleSellChildToBank(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleSellBasementToBank(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleSellChildToBank(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Старт
-    if (!handled && await handleStartCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
+    if (!handled && await handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
     
     // Сохранение изменений
     if (dataChanged) {
