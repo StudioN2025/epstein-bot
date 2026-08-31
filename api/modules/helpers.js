@@ -3,7 +3,7 @@ import config from './config.js';
 // Кэш для данных
 let dataCache = null;
 let cacheTime = 0;
-const CACHE_TTL = 10000; // 10 секунд кэш
+const CACHE_TTL = 10000;
 
 // Загрузка данных
 export async function loadData() {
@@ -46,50 +46,36 @@ export async function saveData(data) {
   }
 }
 
-// Отправка сообщения с полными логами
+// Отправка сообщения - БЕЗ Markdown
 export async function sendMessage(token, chatId, text, keyboard = null) {
-  console.log(`📤 ===== SENDING MESSAGE =====`);
-  console.log(`📤 Chat ID: ${chatId}`);
-  console.log(`📤 Text: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`);
-  console.log(`📤 Has keyboard: ${!!keyboard}`);
+  console.log(`📤 Sending to ${chatId}: "${text.substring(0, 50)}..."`);
   
-  const body = { chat_id: chatId, text, parse_mode: 'Markdown' };
+  const body = { chat_id: chatId, text };
   if (keyboard) body.reply_markup = keyboard;
   
   try {
-    const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    console.log(`📤 URL: ${url}`);
-    console.log(`📤 Body: ${JSON.stringify(body).substring(0, 200)}...`);
-    
-    const response = await fetch(url, {
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     
     const result = await response.json();
-    console.log(`📤 Response status: ${response.status}`);
-    console.log(`📤 Response ok: ${result.ok}`);
-    
     if (!result.ok) {
       console.log(`📤 ERROR: ${JSON.stringify(result)}`);
     } else {
-      console.log(`📤 Message sent successfully! Message ID: ${result.result?.message_id}`);
+      console.log(`📤 OK! Message ID: ${result.result?.message_id}`);
     }
-    
-    console.log(`📤 ===== END SEND =====`);
     return result;
   } catch (e) {
-    console.error('📤 Send message error:', e.message);
-    console.error('📤 Stack:', e.stack);
-    console.log(`📤 ===== END SEND (ERROR) =====`);
+    console.error('Send message error:', e.message);
     return null;
   }
 }
 
 // Редактирование сообщения
 export async function editMessage(token, chatId, messageId, text, keyboard = null) {
-  const body = { chat_id: chatId, message_id: messageId, text, parse_mode: 'Markdown' };
+  const body = { chat_id: chatId, message_id: messageId, text };
   if (keyboard) body.reply_markup = keyboard;
   
   try {
