@@ -3,12 +3,10 @@
   "name": "epstain-bot",
   "version": "1.0.0",
   "description": "Telegram bot for Epstein Island",
-  "main": "api/webhook.js",
   "scripts": {
     "start": "node api/webhook.js"
   },
-  "dependencies": {},
   "engines": {
-    "node": "24.x"
+    "node": "22.x"
   }
 }
