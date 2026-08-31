@@ -1,4 +1,4 @@
-const config = require('./config');
+import config from './config.js';
 
 // Кэш для данных
 let dataCache = null;
@@ -6,7 +6,7 @@ let cacheTime = 0;
 const CACHE_TTL = 10000; // 10 секунд кэш
 
 // Загрузка данных
-async function loadData() {
+export async function loadData() {
   const now = Date.now();
   if (dataCache && (now - cacheTime) < CACHE_TTL) {
     return dataCache;
@@ -28,7 +28,7 @@ async function loadData() {
 }
 
 // Сохранение данных
-async function saveData(data) {
+export async function saveData(data) {
   dataCache = data;
   cacheTime = Date.now();
   
@@ -47,7 +47,7 @@ async function saveData(data) {
 }
 
 // Отправка сообщения
-async function sendMessage(token, chatId, text, keyboard = null) {
+export async function sendMessage(token, chatId, text, keyboard = null) {
   const body = { chat_id: chatId, text, parse_mode: 'Markdown' };
   if (keyboard) body.reply_markup = keyboard;
   
@@ -63,7 +63,7 @@ async function sendMessage(token, chatId, text, keyboard = null) {
 }
 
 // Редактирование сообщения
-async function editMessage(token, chatId, messageId, text, keyboard = null) {
+export async function editMessage(token, chatId, messageId, text, keyboard = null) {
   const body = { chat_id: chatId, message_id: messageId, text, parse_mode: 'Markdown' };
   if (keyboard) body.reply_markup = keyboard;
   
@@ -79,7 +79,7 @@ async function editMessage(token, chatId, messageId, text, keyboard = null) {
 }
 
 // Удаление сообщения
-async function deleteMessage(token, chatId, messageId) {
+export async function deleteMessage(token, chatId, messageId) {
   try {
     await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
       method: 'POST',
@@ -92,7 +92,7 @@ async function deleteMessage(token, chatId, messageId) {
 }
 
 // Ответ на callback
-async function answerCallback(callbackId, text = null) {
+export async function answerCallback(callbackId, text = null) {
   const body = { callback_query_id: callbackId };
   if (text) body.text = text;
   
@@ -108,24 +108,24 @@ async function answerCallback(callbackId, text = null) {
 }
 
 // Очистка команды
-function cleanCommand(text) {
+export function cleanCommand(text) {
   if (!text) return '';
   return text.toLowerCase().replace(/@\w+/, '').trim();
 }
 
 // Проверка админа в личке
-function isAdminPrivate(userId, chatType) {
+export function isAdminPrivate(userId, chatType) {
   return (userId === config.ADMIN_USER_ID && chatType === 'private');
 }
 
 // Экранирование Markdown
-function escapeMarkdown(text) {
+export function escapeMarkdown(text) {
   if (!text) return 'Unknown';
   return String(text).replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
 }
 
 // Функции для захваченных подвалов
-function addCapturedBasement(user, ownerId, ownerName) {
+export function addCapturedBasement(user, ownerId, ownerName) {
   if (!user.capturedBasementsDetails) user.capturedBasementsDetails = [];
   
   const existing = user.capturedBasementsDetails.find(c => c.ownerId === ownerId);
@@ -137,7 +137,7 @@ function addCapturedBasement(user, ownerId, ownerName) {
   user.capturedBasements = (user.capturedBasements || 0) + 1;
 }
 
-function removeCapturedBasement(user, ownerId, amount = 1) {
+export function removeCapturedBasement(user, ownerId, amount = 1) {
   if (!user.capturedBasementsDetails) return 0;
   
   const existing = user.capturedBasementsDetails.find(c => c.ownerId === ownerId);
@@ -153,17 +153,3 @@ function removeCapturedBasement(user, ownerId, amount = 1) {
   }
   return 0;
 }
-
-module.exports = {
-  loadData,
-  saveData,
-  sendMessage,
-  editMessage,
-  deleteMessage,
-  answerCallback,
-  cleanCommand,
-  isAdminPrivate,
-  escapeMarkdown,
-  addCapturedBasement,
-  removeCapturedBasement
-};
