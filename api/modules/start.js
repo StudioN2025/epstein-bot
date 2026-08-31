@@ -1,197 +1,205 @@
-const { sendMessage, saveData, escapeMarkdown } = require('./helpers');
-const config = require('./config');
+import { sendMessage, saveData, escapeMarkdown } from './helpers.js';
+import config from './config.js';
 
 // ========== АДМИН-КОМАНДЫ ==========
 
-async function handleAddSoap(parts, user, data, BOT_TOKEN, chatId, username) {
-  if (parts.length < 3) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ /addsoap @username 50`);
-    return true;
-  }
-  let targetUsername = parts[1].replace('@', '');
-  const amount = parseInt(parts[2]);
-  if (isNaN(amount) || amount <= 0) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
-    return true;
-  }
-  let targetId = null;
-  for (const [id, u] of Object.entries(data.users)) {
-    if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
-      targetId = parseInt(id);
-      break;
+export async function handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin) {
+  if (!isAdmin) return false;
+  
+  const parts = rawText.split(' ');
+  
+  if (cmd === '/addsoap') {
+    if (parts.length < 3) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ /addsoap @username 50`);
+      return true;
     }
-  }
-  if (!targetId) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
-    return true;
-  }
-  let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0 };
-  targetUser.balance = (targetUser.balance || 0) + amount;
-  targetUser.username = targetUsername;
-  data.users[targetId] = targetUser;
-  await saveData(data);
-  await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} добавил ${amount} 🧼 @${targetUsername}\n📊 Теперь: ${targetUser.balance} 🧼`);
-  return true;
-}
-
-async function handleRemoveSoap(parts, user, data, BOT_TOKEN, chatId, username) {
-  if (parts.length < 3) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ /removesoap @username 50`);
-    return true;
-  }
-  let targetUsername = parts[1].replace('@', '');
-  const amount = parseInt(parts[2]);
-  if (isNaN(amount) || amount <= 0) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
-    return true;
-  }
-  let targetId = null;
-  for (const [id, u] of Object.entries(data.users)) {
-    if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
-      targetId = parseInt(id);
-      break;
+    let targetUsername = parts[1].replace('@', '');
+    const amount = parseInt(parts[2]);
+    if (isNaN(amount) || amount <= 0) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+      return true;
     }
-  }
-  if (!targetId) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
-    return true;
-  }
-  let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0 };
-  targetUser.balance = Math.max(0, (targetUser.balance || 0) - amount);
-  targetUser.username = targetUsername;
-  data.users[targetId] = targetUser;
-  await saveData(data);
-  await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} снял ${amount} 🧼 у @${targetUsername}\n📊 Теперь: ${targetUser.balance} 🧼`);
-  return true;
-}
-
-async function handleAddChild(parts, user, data, BOT_TOKEN, chatId, username) {
-  if (parts.length < 3) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ /addchild @username 2`);
-    return true;
-  }
-  let targetUsername = parts[1].replace('@', '');
-  const amount = parseInt(parts[2]);
-  if (isNaN(amount) || amount <= 0) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
-    return true;
-  }
-  let targetId = null;
-  for (const [id, u] of Object.entries(data.users)) {
-    if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
-      targetId = parseInt(id);
-      break;
+    let targetId = null;
+    for (const [id, u] of Object.entries(data.users)) {
+      if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+        targetId = parseInt(id);
+        break;
+      }
     }
-  }
-  if (!targetId) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
-    return true;
-  }
-  let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0 };
-  targetUser.children = (targetUser.children || 0) + amount;
-  targetUser.username = targetUsername;
-  data.users[targetId] = targetUser;
-  await saveData(data);
-  await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} добавил ${amount} 👶 @${targetUsername}\n📊 Теперь: ${targetUser.children} 👶`);
-  return true;
-}
-
-async function handleRemoveChild(parts, user, data, BOT_TOKEN, chatId, username) {
-  if (parts.length < 3) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ /removechild @username 2`);
-    return true;
-  }
-  let targetUsername = parts[1].replace('@', '');
-  const amount = parseInt(parts[2]);
-  if (isNaN(amount) || amount <= 0) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
-    return true;
-  }
-  let targetId = null;
-  for (const [id, u] of Object.entries(data.users)) {
-    if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
-      targetId = parseInt(id);
-      break;
+    if (!targetId) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+      return true;
     }
-  }
-  if (!targetId) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+    let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0 };
+    targetUser.balance = (targetUser.balance || 0) + amount;
+    targetUser.username = targetUsername;
+    data.users[targetId] = targetUser;
+    await saveData(data);
+    await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} добавил ${amount} 🧼 @${targetUsername}\n📊 Теперь: ${targetUser.balance} 🧼`);
     return true;
   }
-  let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0 };
-  targetUser.children = Math.max(0, (targetUser.children || 0) - amount);
-  targetUser.username = targetUsername;
-  data.users[targetId] = targetUser;
-  await saveData(data);
-  await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} снял ${amount} 👶 у @${targetUsername}\n📊 Теперь: ${targetUser.children} 👶`);
-  return true;
-}
-
-async function handleAddBasement(parts, user, data, BOT_TOKEN, chatId, username) {
-  if (parts.length < 3) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ /addbasement @username 2`);
-    return true;
-  }
-  let targetUsername = parts[1].replace('@', '');
-  const amount = parseInt(parts[2]);
-  if (isNaN(amount) || amount <= 0) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
-    return true;
-  }
-  let targetId = null;
-  for (const [id, u] of Object.entries(data.users)) {
-    if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
-      targetId = parseInt(id);
-      break;
+  
+  if (cmd === '/removesoap') {
+    if (parts.length < 3) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ /removesoap @username 50`);
+      return true;
     }
-  }
-  if (!targetId) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
-    return true;
-  }
-  let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0 };
-  targetUser.basements = (targetUser.basements || 0) + amount;
-  targetUser.username = targetUsername;
-  data.users[targetId] = targetUser;
-  await saveData(data);
-  await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} добавил ${amount} 🏚️ @${targetUsername}\n📊 Теперь: ${targetUser.basements} 🏚️`);
-  return true;
-}
-
-async function handleRemoveBasement(parts, user, data, BOT_TOKEN, chatId, username) {
-  if (parts.length < 3) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ /removebasement @username 2`);
-    return true;
-  }
-  let targetUsername = parts[1].replace('@', '');
-  const amount = parseInt(parts[2]);
-  if (isNaN(amount) || amount <= 0) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
-    return true;
-  }
-  let targetId = null;
-  for (const [id, u] of Object.entries(data.users)) {
-    if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
-      targetId = parseInt(id);
-      break;
+    let targetUsername = parts[1].replace('@', '');
+    const amount = parseInt(parts[2]);
+    if (isNaN(amount) || amount <= 0) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+      return true;
     }
-  }
-  if (!targetId) {
-    await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+    let targetId = null;
+    for (const [id, u] of Object.entries(data.users)) {
+      if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+        targetId = parseInt(id);
+        break;
+      }
+    }
+    if (!targetId) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+      return true;
+    }
+    let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0 };
+    targetUser.balance = Math.max(0, (targetUser.balance || 0) - amount);
+    targetUser.username = targetUsername;
+    data.users[targetId] = targetUser;
+    await saveData(data);
+    await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} снял ${amount} 🧼 у @${targetUsername}\n📊 Теперь: ${targetUser.balance} 🧼`);
     return true;
   }
-  let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0 };
-  targetUser.basements = Math.max(0, (targetUser.basements || 0) - amount);
-  targetUser.username = targetUsername;
-  data.users[targetId] = targetUser;
-  await saveData(data);
-  await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} снял ${amount} 🏚️ у @${targetUsername}\n📊 Теперь: ${targetUser.basements} 🏚️`);
-  return true;
+  
+  if (cmd === '/addchild') {
+    if (parts.length < 3) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ /addchild @username 2`);
+      return true;
+    }
+    let targetUsername = parts[1].replace('@', '');
+    const amount = parseInt(parts[2]);
+    if (isNaN(amount) || amount <= 0) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+      return true;
+    }
+    let targetId = null;
+    for (const [id, u] of Object.entries(data.users)) {
+      if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+        targetId = parseInt(id);
+        break;
+      }
+    }
+    if (!targetId) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+      return true;
+    }
+    let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0 };
+    targetUser.children = (targetUser.children || 0) + amount;
+    targetUser.username = targetUsername;
+    data.users[targetId] = targetUser;
+    await saveData(data);
+    await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} добавил ${amount} 👶 @${targetUsername}\n📊 Теперь: ${targetUser.children} 👶`);
+    return true;
+  }
+  
+  if (cmd === '/removechild') {
+    if (parts.length < 3) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ /removechild @username 2`);
+      return true;
+    }
+    let targetUsername = parts[1].replace('@', '');
+    const amount = parseInt(parts[2]);
+    if (isNaN(amount) || amount <= 0) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+      return true;
+    }
+    let targetId = null;
+    for (const [id, u] of Object.entries(data.users)) {
+      if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+        targetId = parseInt(id);
+        break;
+      }
+    }
+    if (!targetId) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+      return true;
+    }
+    let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0 };
+    targetUser.children = Math.max(0, (targetUser.children || 0) - amount);
+    targetUser.username = targetUsername;
+    data.users[targetId] = targetUser;
+    await saveData(data);
+    await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} снял ${amount} 👶 у @${targetUsername}\n📊 Теперь: ${targetUser.children} 👶`);
+    return true;
+  }
+  
+  if (cmd === '/addbasement') {
+    if (parts.length < 3) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ /addbasement @username 2`);
+      return true;
+    }
+    let targetUsername = parts[1].replace('@', '');
+    const amount = parseInt(parts[2]);
+    if (isNaN(amount) || amount <= 0) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+      return true;
+    }
+    let targetId = null;
+    for (const [id, u] of Object.entries(data.users)) {
+      if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+        targetId = parseInt(id);
+        break;
+      }
+    }
+    if (!targetId) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+      return true;
+    }
+    let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0 };
+    targetUser.basements = (targetUser.basements || 0) + amount;
+    targetUser.username = targetUsername;
+    data.users[targetId] = targetUser;
+    await saveData(data);
+    await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} добавил ${amount} 🏚️ @${targetUsername}\n📊 Теперь: ${targetUser.basements} 🏚️`);
+    return true;
+  }
+  
+  if (cmd === '/removebasement') {
+    if (parts.length < 3) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ /removebasement @username 2`);
+      return true;
+    }
+    let targetUsername = parts[1].replace('@', '');
+    const amount = parseInt(parts[2]);
+    if (isNaN(amount) || amount <= 0) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Укажи положительное число!`);
+      return true;
+    }
+    let targetId = null;
+    for (const [id, u] of Object.entries(data.users)) {
+      if (u.username && u.username.toLowerCase() === targetUsername.toLowerCase()) {
+        targetId = parseInt(id);
+        break;
+      }
+    }
+    if (!targetId) {
+      await sendMessage(BOT_TOKEN, chatId, `❌ Не найден @${targetUsername}`);
+      return true;
+    }
+    let targetUser = data.users[targetId] || { balance: 0, children: 0, basements: 0 };
+    targetUser.basements = Math.max(0, (targetUser.basements || 0) - amount);
+    targetUser.username = targetUsername;
+    data.users[targetId] = targetUser;
+    await saveData(data);
+    await sendMessage(BOT_TOKEN, chatId, `✅ Админ ${username} снял ${amount} 🏚️ у @${targetUsername}\n📊 Теперь: ${targetUser.basements} 🏚️`);
+    return true;
+  }
+  
+  return false;
 }
 
 // ========== ТОПЫ ==========
 
-async function handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/top') return false;
   
   const users = Object.values(data.users);
@@ -211,7 +219,7 @@ async function handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatI
   return true;
 }
 
-async function handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/topchildren') return false;
   
   const users = Object.values(data.users);
@@ -233,7 +241,7 @@ async function handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKE
   return true;
 }
 
-async function handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/topbasements') return false;
   
   const users = Object.values(data.users);
@@ -257,7 +265,7 @@ async function handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOK
 
 // ========== РЕЙТИНГ / RANK ==========
 
-async function handleRankCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleRankCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/rank' && !cleanText.startsWith('/rank ')) return false;
   
   const parts = rawText.split(' ');
@@ -402,7 +410,7 @@ async function handleRankCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
 
 // ========== СТАРТОВАЯ КОМАНДА ==========
 
-async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin) {
+export async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin) {
   if (cleanText !== '/start') return false;
   
   let adminCommands = '';
@@ -451,12 +459,3 @@ async function handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, cha
     `🔑 1 подвал = ${config.CHILDREN_PER_BASEMENT} детей`);
   return true;
 }
-
-module.exports = { 
-  handleStartCommand,
-  handleAdminCommand,
-  handleTopCommand,
-  handleTopChildrenCommand,
-  handleTopBasementsCommand,
-  handleRankCommand
-};
