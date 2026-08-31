@@ -1,9 +1,9 @@
-const { sendMessage, saveData, escapeMarkdown } = require('./helpers');
-const config = require('./config');
+import { sendMessage, saveData, escapeMarkdown } from './helpers.js';
+import config from './config.js';
 
 // ========== ДЕТИ ==========
 
-async function handleChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   // Покупка детей
   if (cleanText.startsWith('/buychild')) {
     let amount = 1;
@@ -64,7 +64,7 @@ async function handleChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, 
 
 // ========== ПОДВАЛЫ ==========
 
-async function handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   // Покупка подвалов
   if (cleanText.startsWith('/buybasement')) {
     let amount = 1;
@@ -114,7 +114,7 @@ async function handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, 
 
 // ========== ПЕРЕВОДЫ ==========
 
-async function handleSendSoap(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleSendSoap(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (!cleanText.startsWith('/sendsoap')) return false;
   
   const parts = rawText.split(' ');
@@ -170,7 +170,7 @@ async function handleSendSoap(cleanText, rawText, user, data, BOT_TOKEN, chatId,
   return true;
 }
 
-async function handleSendChild(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleSendChild(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (!cleanText.startsWith('/sendchild')) return false;
   
   const parts = rawText.split(' ');
@@ -227,7 +227,7 @@ async function handleSendChild(cleanText, rawText, user, data, BOT_TOKEN, chatId
   return true;
 }
 
-async function handleSendBasement(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleSendBasement(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (!cleanText.startsWith('/sendbasement')) return false;
   
   const parts = rawText.split(' ');
@@ -283,11 +283,3 @@ async function handleSendBasement(cleanText, rawText, user, data, BOT_TOKEN, cha
     `📊 У ${escapeMarkdown(username)}: ${user.basements} 🏚️\n📊 У @${escapeMarkdown(targetName)}: ${targetUser.basements} 🏚️`);
   return true;
 }
-
-module.exports = { 
-  handleChildrenCommand, 
-  handleBasementCommand,
-  handleSendSoap,
-  handleSendChild,
-  handleSendBasement
-};
