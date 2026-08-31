@@ -46,19 +46,44 @@ export async function saveData(data) {
   }
 }
 
-// Отправка сообщения
+// Отправка сообщения с полными логами
 export async function sendMessage(token, chatId, text, keyboard = null) {
+  console.log(`📤 ===== SENDING MESSAGE =====`);
+  console.log(`📤 Chat ID: ${chatId}`);
+  console.log(`📤 Text: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`);
+  console.log(`📤 Has keyboard: ${!!keyboard}`);
+  
   const body = { chat_id: chatId, text, parse_mode: 'Markdown' };
   if (keyboard) body.reply_markup = keyboard;
   
   try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const url = `https://api.telegram.org/bot${token}/sendMessage`;
+    console.log(`📤 URL: ${url}`);
+    console.log(`📤 Body: ${JSON.stringify(body).substring(0, 200)}...`);
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
+    
+    const result = await response.json();
+    console.log(`📤 Response status: ${response.status}`);
+    console.log(`📤 Response ok: ${result.ok}`);
+    
+    if (!result.ok) {
+      console.log(`📤 ERROR: ${JSON.stringify(result)}`);
+    } else {
+      console.log(`📤 Message sent successfully! Message ID: ${result.result?.message_id}`);
+    }
+    
+    console.log(`📤 ===== END SEND =====`);
+    return result;
   } catch (e) {
-    console.error('Send message error:', e.message);
+    console.error('📤 Send message error:', e.message);
+    console.error('📤 Stack:', e.stack);
+    console.log(`📤 ===== END SEND (ERROR) =====`);
+    return null;
   }
 }
 
