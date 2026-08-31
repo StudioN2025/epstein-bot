@@ -121,7 +121,12 @@ export default async function handler(req, res) {
     const cleanText = cleanCommand(rawText);
     const cmd = cleanText.split(' ')[0];
     
-    console.log(`📩 Command: ${cmd} from ${username} (${userId}) in chat ${chatId}`);
+    console.log(`📩 ===== NEW COMMAND =====`);
+    console.log(`📩 Command: ${cmd}`);
+    console.log(`📩 Raw text: "${rawText}"`);
+    console.log(`📩 Clean text: "${cleanText}"`);
+    console.log(`📩 From: ${username} (${userId})`);
+    console.log(`📩 Chat: ${chatId}, type: ${update.message.chat.type}`);
     
     // ======== ПРОВЕРКА ГРУППЫ ПОЛНОСТЬЮ УБРАНА ========
     // Бот отвечает всем в любом чате
@@ -138,6 +143,7 @@ export default async function handler(req, res) {
     // Создание пользователя
     let user = data.users[userId];
     if (!user) {
+      console.log(`👤 Creating new user for ${username}`);
       user = { 
         balance: 0, children: 0, basements: 0, username, lastFarm: 0, mutedUntil: 0, lastChildIncome: Date.now(),
         mobilized: 0, capturedBasements: 0, capturedBasementsDetails: [], lastCapturedIncome: Date.now()
@@ -155,6 +161,7 @@ export default async function handler(req, res) {
     // Проверка мута
     if (user.mutedUntil && user.mutedUntil > Math.floor(Date.now() / 1000)) {
       const remaining = user.mutedUntil - Math.floor(Date.now() / 1000);
+      console.log(`🔇 ${username} is muted for ${Math.ceil(remaining / 60)} min`);
       await sendMessage(BOT_TOKEN, chatId, `🔇 ${username}, мут ${Math.ceil(remaining / 60)} мин!`);
       if (dataChanged) await saveData(data);
       return res.status(200).json({ ok: true });
@@ -182,63 +189,158 @@ export default async function handler(req, res) {
     
     // Админ-команды
     if (!handled && adminCommands.includes(cmd)) {
+      console.log(`📌 Handling admin command: ${cmd}`);
       handled = await handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin);
     }
     // Промокоды (админские)
-    if (!handled && await handleCreatePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
-    if (!handled && await handlePromoList(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
-    if (!handled && await handleDeletePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
+    if (!handled && await handleCreatePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
+      console.log(`✅ handleCreatePromo handled`);
+      handled = true;
+    }
+    if (!handled && await handlePromoList(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
+      console.log(`✅ handlePromoList handled`);
+      handled = true;
+    }
+    if (!handled && await handleDeletePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) {
+      console.log(`✅ handleDeletePromo handled`);
+      handled = true;
+    }
     // Промокоды (обычные)
-    if (!handled && await handlePromoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handlePromoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handlePromoCommand handled`);
+      handled = true;
+    }
     // Ядерная бомба
-    if (!handled && await handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
+    if (!handled && await handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) {
+      console.log(`✅ handleNukeCommand handled`);
+      handled = true;
+    }
     // Подвалы и дети
-    if (!handled && await handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleBasementCommand handled`);
+      handled = true;
+    }
+    if (!handled && await handleChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleChildrenCommand handled`);
+      handled = true;
+    }
     // Переводы
-    if (!handled && await handleSendSoap(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleSendChild(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleSendBasement(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleSendSoap(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleSendSoap handled`);
+      handled = true;
+    }
+    if (!handled && await handleSendChild(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleSendChild handled`);
+      handled = true;
+    }
+    if (!handled && await handleSendBasement(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleSendBasement handled`);
+      handled = true;
+    }
     // Казино
-    if (!handled && await handleCasinoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleCasinoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleCasinoCommand handled`);
+      handled = true;
+    }
     // Дуэли
-    if (!handled && await handleDuelCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, duels)) handled = true;
-    // Фарм
-    if (!handled && await handleFarmCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleDuelCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, duels)) {
+      console.log(`✅ handleDuelCommand handled`);
+      handled = true;
+    }
+    // ======== ФАРМ С ЛОГАМИ ========
+    console.log(`🔍 Checking /farm for user ${userId}, username: ${username}, handled: ${handled}`);
+    if (!handled) {
+      console.log(`🔍 Calling handleFarmCommand with cleanText: "${cleanText}"`);
+      const farmResult = await handleFarmCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId);
+      console.log(`🔍 Farm result: ${farmResult}`);
+      if (farmResult) {
+        handled = true;
+        console.log(`✅ /farm handled successfully`);
+      }
+    }
+    // ===============================
     // Активность
-    if (!handled && await handleActivityCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleTopActivityCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleActivityCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleActivityCommand handled`);
+      handled = true;
+    }
+    if (!handled && await handleTopActivityCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleTopActivityCommand handled`);
+      handled = true;
+    }
     // Баланс
-    if (!handled && await handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleBalanceCommand handled`);
+      handled = true;
+    }
     // Топы
-    if (!handled && await handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleTopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleTopCommand handled`);
+      handled = true;
+    }
+    if (!handled && await handleTopChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleTopChildrenCommand handled`);
+      handled = true;
+    }
+    if (!handled && await handleTopBasementsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleTopBasementsCommand handled`);
+      handled = true;
+    }
     // Рейтинг
-    if (!handled && await handleRankCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleRankCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleRankCommand handled`);
+      handled = true;
+    }
     // Ивенты
-    if (!handled && await handleEventsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleEventsCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleEventsCommand handled`);
+      handled = true;
+    }
     // Магазин
-    if (!handled && await handleCreateListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleBuyListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleRemoveListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleShopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleCreateListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleCreateListing handled`);
+      handled = true;
+    }
+    if (!handled && await handleBuyListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleBuyListing handled`);
+      handled = true;
+    }
+    if (!handled && await handleRemoveListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleRemoveListing handled`);
+      handled = true;
+    }
+    if (!handled && await handleShopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleShopCommand handled`);
+      handled = true;
+    }
     // Продажа в банк
-    if (!handled && await handleSellBasementToBank(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
-    if (!handled && await handleSellChildToBank(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    if (!handled && await handleSellBasementToBank(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleSellBasementToBank handled`);
+      handled = true;
+    }
+    if (!handled && await handleSellChildToBank(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) {
+      console.log(`✅ handleSellChildToBank handled`);
+      handled = true;
+    }
     // Старт
-    if (!handled && await handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
+    if (!handled && await handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) {
+      console.log(`✅ handleStartCommand handled`);
+      handled = true;
+    }
     
     if (!handled) {
-      console.log(`⚠️ Command ${cmd} not handled`);
+      console.log(`⚠️ Command "${cmd}" not handled`);
     } else {
-      console.log(`✅ Command ${cmd} handled successfully`);
+      console.log(`✅ Command "${cmd}" handled successfully`);
     }
     
     // Сохранение изменений
     if (dataChanged) {
+      console.log(`💾 Saving data...`);
       await saveData(data);
     }
+    
+    console.log(`📩 ===== END COMMAND =====\n`);
     
     return res.status(200).json({ ok: true });
     
