@@ -16,10 +16,9 @@ let adminCache = {};
 let adminCacheTime = {};
 let dataChanged = false;
 
-const ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 минут
+const ADMIN_CACHE_TTL = 5 * 60 * 1000;
 
 async function isAdminCheck(botToken, chatId, userId) {
-  // Админ из конфига
   if (userId === config.ADMIN_USER_ID) return true;
   
   const cacheKey = `${chatId}_${userId}`;
@@ -39,8 +38,10 @@ async function isAdminCheck(botToken, chatId, userId) {
     const isAdmin = data.ok && (data.result.status === 'creator' || data.result.status === 'administrator');
     adminCache[cacheKey] = isAdmin;
     adminCacheTime[cacheKey] = now;
+    console.log(`Admin check for ${userId}: ${isAdmin}`);
     return isAdmin;
   } catch (error) {
+    console.error('Admin check error:', error);
     return false;
   }
 }
@@ -92,7 +93,6 @@ async function handleEventsCommand(cleanText, rawText, user, data, BOT_TOKEN, ch
 export default async function handler(req, res) {
   const BOT_TOKEN = process.env.BOT_TOKEN;
   
-  // Обработка GET запроса
   if (req.method === 'GET') {
     return res.status(200).json({ ok: true, message: 'Epstain Bot 🧼', time: Date.now() });
   }
@@ -104,7 +104,6 @@ export default async function handler(req, res) {
   try {
     const update = req.body;
     
-    // Обработка callback кнопок
     if (update.callback_query) {
       const cbData = update.callback_query.data;
       if (cbData.startsWith('accept_') || cbData.startsWith('aim_') || cbData.startsWith('break_') || cbData.startsWith('shoot_')) {
@@ -122,17 +121,22 @@ export default async function handler(req, res) {
     const cleanText = cleanCommand(rawText);
     const cmd = cleanText.split(' ')[0];
     
-    // ======== ПРОВЕРКА ДОСТУПА - ПРОПУСКАЕМ ВСЕХ В ГРУППЕ ========
+    console.log(`📩 Command: ${cmd} from ${username} (${userId}) in chat ${chatId}`);
+    
+    // ======== УПРОЩЕННАЯ ПРОВЕРКА ДОСТУПА ========
     const isPrivate = update.message.chat.type === 'private';
     const isAllowedGroup = chatId === config.ALLOWED_CHAT_ID;
     const isAdminUser = userId === config.ADMIN_USER_ID;
     
-    // Если это НЕ группа и НЕ личка с админом - блокируем
+    console.log(`isPrivate: ${isPrivate}, isAllowedGroup: ${isAllowedGroup}, isAdminUser: ${isAdminUser}`);
+    
+    // Если это НЕ разрешенная группа И НЕ личка с админом - блокируем
     if (!isAllowedGroup && !(isPrivate && isAdminUser)) {
+      console.log(`⛔ Blocked: not allowed group and not admin private`);
       await sendMessage(BOT_TOKEN, chatId, `🧼 Детское мыло только на острове: ${config.GROUP_INVITE_LINK}`);
       return res.status(200).json({ ok: true });
     }
-    // ============================================================
+    // =============================================
     
     // Загрузка данных
     let data = await loadData();
@@ -170,8 +174,11 @@ export default async function handler(req, res) {
     // ======== ПРОВЕРКА АДМИНА ТОЛЬКО ДЛЯ АДМИН-КОМАНД ========
     const adminCommands = ['/addsoap', '/removesoap', '/addchild', '/removechild', '/addbasement', '/removebasement', '/addmobilized', '/removemobilized', '/createpromo', '/deletepromo', '/promolist', '/removenuke'];
     let isAdmin = false;
+    
+    // Проверяем админа ТОЛЬКО если это админ-команда
     if (adminCommands.includes(cmd)) {
       isAdmin = await isAdminCheck(BOT_TOKEN, chatId, userId);
+      console.log(`🔐 Admin check for ${cmd}: ${isAdmin}`);
       if (!isAdmin) {
         await sendMessage(BOT_TOKEN, chatId, `❌ Только для админов!`);
         return res.status(200).json({ ok: true });
@@ -181,6 +188,8 @@ export default async function handler(req, res) {
     
     // Обработка команд
     let handled = false;
+    
+    console.log(`🔄 Processing command: ${cmd}`);
     
     // Админ-команды
     if (!handled && adminCommands.includes(cmd)) {
@@ -231,6 +240,12 @@ export default async function handler(req, res) {
     // Старт
     if (!handled && await handleStartCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
     
+    if (!handled) {
+      console.log(`⚠️ Command ${cmd} not handled`);
+    } else {
+      console.log(`✅ Command ${cmd} handled successfully`);
+    }
+    
     // Сохранение изменений
     if (dataChanged) {
       await saveData(data);
@@ -239,7 +254,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
     
   } catch (error) {
-    console.error('Error:', error);
+    console.error('❌ Error:', error);
     return res.status(200).json({ ok: false, error: error.message });
   }
 }
