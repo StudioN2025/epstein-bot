@@ -123,20 +123,9 @@ export default async function handler(req, res) {
     
     console.log(`📩 Command: ${cmd} from ${username} (${userId}) in chat ${chatId}`);
     
-    // ======== УПРОЩЕННАЯ ПРОВЕРКА ДОСТУПА ========
-    const isPrivate = update.message.chat.type === 'private';
-    const isAllowedGroup = chatId === config.ALLOWED_CHAT_ID;
-    const isAdminUser = userId === config.ADMIN_USER_ID;
-    
-    console.log(`isPrivate: ${isPrivate}, isAllowedGroup: ${isAllowedGroup}, isAdminUser: ${isAdminUser}`);
-    
-    // Если это НЕ разрешенная группа И НЕ личка с админом - блокируем
-    if (!isAllowedGroup && !(isPrivate && isAdminUser)) {
-      console.log(`⛔ Blocked: not allowed group and not admin private`);
-      await sendMessage(BOT_TOKEN, chatId, `🧼 Детское мыло только на острове: ${config.GROUP_INVITE_LINK}`);
-      return res.status(200).json({ ok: true });
-    }
-    // =============================================
+    // ======== ПРОВЕРКА ГРУППЫ ПОЛНОСТЬЮ УБРАНА ========
+    // Бот отвечает всем в любом чате
+    // ==================================================
     
     // Загрузка данных
     let data = await loadData();
