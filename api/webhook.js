@@ -1,35 +1,20 @@
-const { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, escapeMarkdown } = require('./helpers');
-const config = require('./config');
-const { updateActivityStats } = require('./activity');
-const { handleDuelCallback, handleDuelCommand } = require('./duel');
-
-// Импорты команд
-const { 
-  handleAdminCommand, 
-  handleTopCommand, 
-  handleTopChildrenCommand, 
-  handleTopBasementsCommand, 
-  handleStartCommand, 
-  handleRankCommand 
-} = require('./start');
-
-const { handleFarmCommand } = require('./farm');
-const { handleChildrenCommand, handleBasementCommand, handleSendSoap, handleSendChild, handleSendBasement } = require('./children');
-const { handleCasinoCommand } = require('./casino');
-const { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } = require('./promo');
-const { handleActivityCommand, handleTopActivityCommand } = require('./activity');
-const { 
-  handleCreateListing, 
-  handleBuyListing, 
-  handleRemoveListing, 
-  handleShopCommand,
-  handleSellBasementToBank,
-  handleSellChildToBank
-} = require('./shop');
+import { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, escapeMarkdown } from './helpers.js';
+import config from './config.js';
+import { updateActivityStats } from './activity.js';
+import { handleDuelCallback, handleDuelCommand } from './duel.js';
+import { handleAdminCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleStartCommand, handleRankCommand } from './start.js';
+import { handleFarmCommand } from './farm.js';
+import { handleChildrenCommand, handleBasementCommand, handleSendSoap, handleSendChild, handleSendBasement } from './children.js';
+import { handleCasinoCommand } from './casino.js';
+import { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } from './promo.js';
+import { handleActivityCommand, handleTopActivityCommand } from './activity.js';
+import { handleCreateListing, handleBuyListing, handleRemoveListing, handleShopCommand, handleSellBasementToBank, handleSellChildToBank } from './shop.js';
+import { handleNukeCommand } from './nuke.js';
 
 let duels = {};
 let adminCache = {};
 let adminCacheTime = {};
+let dataChanged = false;
 
 const ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 минут
 
@@ -60,8 +45,6 @@ async function isAdminCheck(botToken, chatId, userId) {
     return false;
   }
 }
-
-let dataChanged = false;
 
 // Функция для /balance
 async function handleBalanceCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
@@ -107,14 +90,17 @@ async function handleEventsCommand(cleanText, rawText, user, data, BOT_TOKEN, ch
   return true;
 }
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   const BOT_TOKEN = process.env.BOT_TOKEN;
   
+  // Обработка GET запроса (проверка работоспособности)
   if (req.method === 'GET') {
     return res.status(200).json({ ok: true, message: 'Epstain Bot 🧼', time: Date.now() });
   }
   
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
   
   try {
     const update = req.body;
@@ -178,7 +164,7 @@ module.exports = async (req, res) => {
     }
     
     // Проверка админа
-    const adminCommands = ['/addsoap', '/removesoap', '/addchild', '/removechild', '/addbasement', '/removebasement', '/addmobilized', '/removemobilized', '/createpromo', '/deletepromo', '/promolist'];
+    const adminCommands = ['/addsoap', '/removesoap', '/addchild', '/removechild', '/addbasement', '/removebasement', '/addmobilized', '/removemobilized', '/createpromo', '/deletepromo', '/promolist', '/removenuke'];
     let isAdmin = false;
     if (adminCommands.includes(cmd)) {
       isAdmin = await isAdminCheck(BOT_TOKEN, chatId, userId);
@@ -196,6 +182,8 @@ module.exports = async (req, res) => {
     if (!handled && await handlePromoList(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
     if (!handled && await handleDeletePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
     if (!handled && await handlePromoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
+    // Ядерная бомба
+    if (!handled && await handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
     // Подвалы и дети
     if (!handled && await handleBasementCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     if (!handled && await handleChildrenCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
@@ -244,6 +232,4 @@ module.exports = async (req, res) => {
     console.error('Error:', error);
     return res.status(200).json({ ok: false, error: error.message });
   }
-};
-
-module.exports.setDataChanged = (value) => { dataChanged = value; };
+}
