@@ -1,15 +1,15 @@
-import { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, escapeMarkdown } from './helpers.js';
-import config from './config.js';
-import { updateActivityStats } from './activity.js';
-import { handleDuelCallback, handleDuelCommand } from './duel.js';
-import { handleAdminCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleStartCommand, handleRankCommand } from './start.js';
-import { handleFarmCommand } from './farm.js';
-import { handleChildrenCommand, handleBasementCommand, handleSendSoap, handleSendChild, handleSendBasement } from './children.js';
-import { handleCasinoCommand } from './casino.js';
-import { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } from './promo.js';
-import { handleActivityCommand, handleTopActivityCommand } from './activity.js';
-import { handleCreateListing, handleBuyListing, handleRemoveListing, handleShopCommand, handleSellBasementToBank, handleSellChildToBank } from './shop.js';
-import { handleNukeCommand } from './nuke.js';
+import { loadData, saveData, sendMessage, cleanCommand, isAdminPrivate, escapeMarkdown } from './modules/helpers.js';
+import config from './modules/config.js';
+import { updateActivityStats } from './modules/activity.js';
+import { handleDuelCallback, handleDuelCommand } from './modules/duel.js';
+import { handleAdminCommand, handleTopCommand, handleTopChildrenCommand, handleTopBasementsCommand, handleStartCommand, handleRankCommand } from './modules/start.js';
+import { handleFarmCommand } from './modules/farm.js';
+import { handleChildrenCommand, handleBasementCommand, handleSendSoap, handleSendChild, handleSendBasement } from './modules/children.js';
+import { handleCasinoCommand } from './modules/casino.js';
+import { handlePromoCommand, handleCreatePromo, handlePromoList, handleDeletePromo } from './modules/promo.js';
+import { handleActivityCommand, handleTopActivityCommand } from './modules/activity.js';
+import { handleCreateListing, handleBuyListing, handleRemoveListing, handleShopCommand, handleSellBasementToBank, handleSellChildToBank } from './modules/shop.js';
+import { handleNukeCommand } from './modules/nuke.js';
 
 let duels = {};
 let adminCache = {};
