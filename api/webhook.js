@@ -19,6 +19,7 @@ let dataChanged = false;
 const ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 минут
 
 async function isAdminCheck(botToken, chatId, userId) {
+  // Админ из конфига
   if (userId === config.ADMIN_USER_ID) return true;
   
   const cacheKey = `${chatId}_${userId}`;
@@ -26,8 +27,6 @@ async function isAdminCheck(botToken, chatId, userId) {
   if (adminCache[cacheKey] && (now - adminCacheTime[cacheKey]) < ADMIN_CACHE_TTL) {
     return adminCache[cacheKey];
   }
-  
-  if (chatId !== config.ALLOWED_CHAT_ID) return false;
   
   try {
     const url = `https://api.telegram.org/bot${botToken}/getChatMember`;
@@ -93,7 +92,7 @@ async function handleEventsCommand(cleanText, rawText, user, data, BOT_TOKEN, ch
 export default async function handler(req, res) {
   const BOT_TOKEN = process.env.BOT_TOKEN;
   
-  // Обработка GET запроса (проверка работоспособности)
+  // Обработка GET запроса
   if (req.method === 'GET') {
     return res.status(200).json({ ok: true, message: 'Epstain Bot 🧼', time: Date.now() });
   }
@@ -123,17 +122,17 @@ export default async function handler(req, res) {
     const cleanText = cleanCommand(rawText);
     const cmd = cleanText.split(' ')[0];
     
-    // ======== ИСПРАВЛЕННАЯ ПРОВЕРКА ДОСТУПА ========
+    // ======== ПРОВЕРКА ДОСТУПА - ПРОПУСКАЕМ ВСЕХ В ГРУППЕ ========
     const isPrivate = update.message.chat.type === 'private';
     const isAllowedGroup = chatId === config.ALLOWED_CHAT_ID;
     const isAdminUser = userId === config.ADMIN_USER_ID;
     
-    // Разрешаем: группу ИЛИ личку с админом
+    // Если это НЕ группа и НЕ личка с админом - блокируем
     if (!isAllowedGroup && !(isPrivate && isAdminUser)) {
       await sendMessage(BOT_TOKEN, chatId, `🧼 Детское мыло только на острове: ${config.GROUP_INVITE_LINK}`);
       return res.status(200).json({ ok: true });
     }
-    // ==============================================
+    // ============================================================
     
     // Загрузка данных
     let data = await loadData();
@@ -153,7 +152,6 @@ export default async function handler(req, res) {
       data.users[userId] = user;
       dataChanged = true;
     } else {
-      // Инициализация полей
       if (user.children === undefined) { user.children = 0; dataChanged = true; }
       if (user.basements === undefined) { user.basements = 0; dataChanged = true; }
       if (user.mobilized === undefined) { user.mobilized = 0; dataChanged = true; }
@@ -169,12 +167,17 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
     
-    // Проверка админа
+    // ======== ПРОВЕРКА АДМИНА ТОЛЬКО ДЛЯ АДМИН-КОМАНД ========
     const adminCommands = ['/addsoap', '/removesoap', '/addchild', '/removechild', '/addbasement', '/removebasement', '/addmobilized', '/removemobilized', '/createpromo', '/deletepromo', '/promolist', '/removenuke'];
     let isAdmin = false;
     if (adminCommands.includes(cmd)) {
       isAdmin = await isAdminCheck(BOT_TOKEN, chatId, userId);
+      if (!isAdmin) {
+        await sendMessage(BOT_TOKEN, chatId, `❌ Только для админов!`);
+        return res.status(200).json({ ok: true });
+      }
     }
+    // ========================================================
     
     // Обработка команд
     let handled = false;
@@ -183,10 +186,11 @@ export default async function handler(req, res) {
     if (!handled && adminCommands.includes(cmd)) {
       handled = await handleAdminCommand(cmd, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin);
     }
-    // Промокоды
+    // Промокоды (админские)
     if (!handled && await handleCreatePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
     if (!handled && await handlePromoList(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
     if (!handled && await handleDeletePromo(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, isAdmin)) handled = true;
+    // Промокоды (обычные)
     if (!handled && await handlePromoCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId)) handled = true;
     // Ядерная бомба
     if (!handled && await handleNukeCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId, isAdmin)) handled = true;
