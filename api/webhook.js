@@ -123,11 +123,17 @@ export default async function handler(req, res) {
     const cleanText = cleanCommand(rawText);
     const cmd = cleanText.split(' ')[0];
     
-    // Проверка доступа
-    if (chatId !== config.ALLOWED_CHAT_ID && !isAdminPrivate(userId, update.message.chat.type)) {
+    // ======== ИСПРАВЛЕННАЯ ПРОВЕРКА ДОСТУПА ========
+    const isPrivate = update.message.chat.type === 'private';
+    const isAllowedGroup = chatId === config.ALLOWED_CHAT_ID;
+    const isAdminUser = userId === config.ADMIN_USER_ID;
+    
+    // Разрешаем: группу ИЛИ личку с админом
+    if (!isAllowedGroup && !(isPrivate && isAdminUser)) {
       await sendMessage(BOT_TOKEN, chatId, `🧼 Детское мыло только на острове: ${config.GROUP_INVITE_LINK}`);
       return res.status(200).json({ ok: true });
     }
+    // ==============================================
     
     // Загрузка данных
     let data = await loadData();
