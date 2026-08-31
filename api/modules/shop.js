@@ -1,5 +1,5 @@
-const { sendMessage, saveData, escapeMarkdown } = require('./helpers');
-const config = require('./config');
+import { sendMessage, saveData, escapeMarkdown } from './helpers.js';
+import config from './config.js';
 
 // ========== МАГАЗИН (БАРАХОЛКА) ==========
 
@@ -18,7 +18,7 @@ async function saveShop(data, shop) {
 }
 
 // Создать объявление
-async function handleCreateListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleCreateListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (!cleanText.startsWith('/sell')) return false;
   
   const parts = rawText.split(' ');
@@ -99,7 +99,7 @@ async function handleCreateListing(cleanText, rawText, user, data, BOT_TOKEN, ch
 }
 
 // Купить объявление
-async function handleBuyListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleBuyListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (!cleanText.startsWith('/buy')) return false;
   
   const parts = rawText.split(' ');
@@ -185,7 +185,7 @@ async function handleBuyListing(cleanText, rawText, user, data, BOT_TOKEN, chatI
 }
 
 // Снять объявление
-async function handleRemoveListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleRemoveListing(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (!cleanText.startsWith('/remove')) return false;
   
   const parts = rawText.split(' ');
@@ -221,7 +221,7 @@ async function handleRemoveListing(cleanText, rawText, user, data, BOT_TOKEN, ch
 }
 
 // Просмотр магазина
-async function handleShopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleShopCommand(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (!cleanText.startsWith('/shop')) return false;
   
   const parts = rawText.split(' ');
@@ -305,7 +305,7 @@ async function handleShopCommand(cleanText, rawText, user, data, BOT_TOKEN, chat
 }
 
 // Продажа подвалов обратно в мыло
-async function handleSellBasementToBank(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleSellBasementToBank(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/sellbasement') return false;
   
   const parts = rawText.split(' ');
@@ -338,7 +338,7 @@ async function handleSellBasementToBank(cleanText, rawText, user, data, BOT_TOKE
 }
 
 // Продажа детей обратно в мыло
-async function handleSellChildToBank(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
+export async function handleSellChildToBank(cleanText, rawText, user, data, BOT_TOKEN, chatId, username, userId) {
   if (cleanText !== '/sellchild') return false;
   
   const parts = rawText.split(' ');
@@ -369,12 +369,3 @@ async function handleSellChildToBank(cleanText, rawText, user, data, BOT_TOKEN, 
     `👶 Осталось детей: ${user.children}`);
   return true;
 }
-
-module.exports = {
-  handleCreateListing,
-  handleBuyListing,
-  handleRemoveListing,
-  handleShopCommand,
-  handleSellBasementToBank,
-  handleSellChildToBank
-};
